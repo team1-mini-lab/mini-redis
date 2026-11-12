@@ -35,5 +35,5 @@ python -m pytest -v
 | --- | --- |
 | 0. 준비 | 완료 |
 | 1. 뼈대 | 완료 (필수 항목 누락 시 400은 6단계로 미룸) |
-| 2. 해시 테이블 | 진행 중: `tests/test_store.py` 작성, `store.py`는 아직 dict 버전이라 테스트 3개 실패 (Red) |
+| 2. 해시 테이블 | 진행 중: `tests/test_store.py`, `tests/test_collision.py` 작성, `store.py`는 아직 dict 버전이라 테스트 실패 (Red) |
 | 3~6단계 | 시작 전 |
