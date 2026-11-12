@@ -1,7 +1,4 @@
 # 미니 레디스 설계 문서
-
-상태: 초안 (팀 합의 후 확정)
-
 개념 설명은 [REDIS_OVERVIEW.md](./REDIS_OVERVIEW.md)에 있습니다.
 
 ## 1. 요구사항
