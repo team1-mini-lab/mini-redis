@@ -1,4 +1,4 @@
-"""직접 만든 해시 테이블 (2단계: 칸 수 고정 + 체이닝).
+"""직접 만든 해시 테이블 (2단계: 체이닝, 3단계: 칸 수 확장).
 
 파이썬 dict를 쓰지 않는다. 칸 배열만 list로 두고, 해시 계산과 충돌 처리는 직접 한다.
 이 파일은 만료, lock, HTTP를 모른다. 키로 값을 넣고, 찾고, 지우는 일만 한다.
@@ -28,6 +28,9 @@ class _Node:
 
 
 class HashTable:
+    MAX_LOAD = 0.75   # 저장된 개수 ÷ 칸 수가 이 값을 넘으면 확장한다
+    GROWTH = 2        # 확장할 때 칸 수를 몇 배로 늘릴지
+
     def __init__(self, capacity=8, hash_fn=fnv1a):
         self._buckets = [None] * capacity  # 칸 배열. 각 칸은 체인의 첫 노드 또는 None
         self._size = 0                     # 저장된 키 개수
@@ -55,7 +58,24 @@ class HashTable:
             node = node.next
         self._buckets[i] = _Node(key, value, self._buckets[i])  # 체인 맨 앞에 붙인다
         self._size += 1
+        if self._size / len(self._buckets) > self.MAX_LOAD:     # 넘을 때만 확장 (같으면 그대로)
+            self._resize(len(self._buckets) * self.GROWTH)
         return True
+
+    def _resize(self, new_capacity):
+        """칸 수를 늘리고 모든 항목을 새 위치로 옮긴다.
+
+        칸 수가 바뀌면 "해시값 % 칸 수"의 결과도 바뀌므로, 항목마다 칸 번호를 다시 계산해야 한다.
+        """
+        old_buckets = self._buckets
+        self._buckets = [None] * new_capacity
+        for node in old_buckets:
+            while node is not None:
+                next_node = node.next              # 옮기면 next가 바뀌므로 미리 기억해 둔다
+                i = self._index(node.key)          # 새 칸 수로 다시 계산
+                node.next = self._buckets[i]       # 기존 노드를 새 칸의 맨 앞에 그대로 옮겨 붙인다
+                self._buckets[i] = node
+                node = next_node
 
     def get(self, key, default=None):
         """값을 돌려준다. 없으면 default."""

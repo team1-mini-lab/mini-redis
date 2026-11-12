@@ -1,4 +1,4 @@
-"""해시 테이블 단위 테스트 (2단계)."""
+"""해시 테이블 단위 테스트 (2~3단계)."""
 import unittest
 
 from mini_redis.hashtable import HashTable, fnv1a
@@ -59,6 +59,51 @@ class HashTableTest(unittest.TestCase):
         self.assertEqual(fnv1a(""), 0xCBF29CE484222325)
         self.assertEqual(fnv1a("a"), 0xAF63DC4C8601EC8C)
         self.assertEqual(fnv1a("foobar"), 0x85944171F73967E8)
+
+
+class ResizeTest(unittest.TestCase):
+    def test_grows_only_when_load_exceeds_threshold(self):
+        t = HashTable()                      # 칸 8개로 시작
+        for i in range(6):
+            t.put(f"k{i}", i)
+        self.assertEqual(t.capacity, 8)      # 6 / 8 = 0.75는 "넘지" 않았으므로 그대로
+        t.put("k6", 6)
+        self.assertEqual(t.capacity, 16)     # 7 / 8 = 0.875 > 0.75 이므로 2배
+
+    def test_overwrite_does_not_grow(self):
+        t = HashTable()
+        for _ in range(100):
+            t.put("same", 1)                 # 같은 키만 덮어쓰면 개수가 늘지 않는다
+        self.assertEqual((len(t), t.capacity), (1, 8))
+
+    def test_100_keys_all_found_after_growth(self):
+        t = HashTable()
+        for i in range(100):
+            t.put(f"key{i}", i)
+        self.assertGreater(t.capacity, 8)
+        for i in range(100):
+            self.assertEqual(t.get(f"key{i}"), i)
+
+    def test_100k_keys_then_remove_half(self):
+        t = HashTable()
+        n = 100_000
+        for i in range(n):
+            t.put(f"key{i}", i)
+        for i in range(n):
+            self.assertEqual(t.get(f"key{i}"), i)
+        for i in range(0, n, 2):
+            self.assertTrue(t.remove(f"key{i}"))
+        self.assertEqual(len(t), n // 2)
+        self.assertIsNone(t.get("key0"))
+        self.assertEqual(t.get("key1"), 1)
+
+    def test_growth_with_all_keys_colliding(self):
+        t = HashTable(hash_fn=same_bucket)
+        for i in range(50):
+            t.put(f"key{i}", i)
+        self.assertGreater(t.capacity, 8)
+        for i in range(50):
+            self.assertEqual(t.get(f"key{i}"), i)
 
 
 if __name__ == "__main__":
