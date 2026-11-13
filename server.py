@@ -19,7 +19,7 @@ def set_value():
     if not isinstance(body, dict) or "key" not in body or "value" not in body:
         return {"error": "key와 value가 필요합니다"}, 400
 
-    store.set(body["key"], body["value"])
+    store.set(body["key"], body["value"], body.get("ttl"))  # ttl은 선택 항목
     return {"ok": True}
 
 

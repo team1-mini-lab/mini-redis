@@ -39,3 +39,15 @@
 | 3 | `hash_table.py` `delete` | 키를 지워도 칸 수는 줄이지 않음 | 과제 요구에 없고, 캐시는 지운 만큼 다시 채워지는 경우가 많음 |
 | 3 | `hash_table.py` `capacity` | 현재 칸 수를 알려 주는 `capacity`를 둠 | 완료 기준 "칸 수가 늘어남"을 확인하기 위함 |
 | 3 | `tests/test_hash_table.py` | 3단계 테스트를 같은 파일에 추가 | 해시 테이블의 약속을 한 파일에서 볼 수 있음 |
+| 4 | `server.py` `set_value` (`body.get("ttl")`) | `/set` 본문의 `ttl`은 선택 항목. 있으면 그대로 `store.set`에 넘김 | DESIGN.md 접점 2의 요청 형식과 같음. 검증은 6단계 |
+| 4 | `store.py` `Store.set` | 항목에 만료 "시점"(`지금 + ttl`)을 저장 | 기간만으로는 언제부터인지 알 수 없음. 조회할 때 현재 시각과 비교만 하면 됨 (DESIGN.md 제안과 같음) |
+| 4 | `store.py` `Store.set` | 값 자리에 `(값, 만료 시점)` 튜플을 넣고, `HashTable`은 고치지 않음 | 해시 테이블은 값을 그대로 넣고 돌려주므로 만료를 몰라도 됨. 2단계에서 정한 "만료는 `Store`에서 처리"를 따름 |
+| 4 | `store.py` `Store.set` | `ttl`을 생략하면 만료 시점은 `None` | "만료 없음"이 코드에 드러남. `float("inf")`는 표준 JSON에 없어 14단계 파일 저장과 맞지 않음 |
+| 4 | `store.py` `Store.set` | 덮어쓰면 만료 시점도 새로 정함. `ttl`을 생략하면 만료가 없어짐 | 이전 값의 만료 시점이 새 값에 남으면 예상하지 못한 삭제가 생김. 실제 레디스 `SET`의 기본 동작과 같음 (DESIGN.md 제안과 같음) |
+| 4 | `store.py` `Store.__init__` (`clock`) | 현재 시각은 `time.monotonic()` | 시계 설정이 바뀌어도 흐른 시간만 정확히 셈. 기준점이 재부팅마다 바뀌므로 14단계를 하면 저장 방식을 따로 정해야 함 |
+| 4 | `store.py` `Store.__init__` (`clock`) | 시계를 인자로 받을 수 있게 함 (기본값 `time.monotonic`) | 테스트에서 가짜 시계를 넣어 5초를 기다리지 않고 만료를 확인하기 위함 |
+| 4 | `store.py` `Store.get` | 만료 확인은 지연 삭제. `get`이 만료를 발견하면 그 자리에서 지우고 `None` | 과제 요구(R5)를 정확히 만족하고 비용이 작음. 지우지 않으면 메모리와 적재율이 부풂. 주기적 정리는 13단계 (DESIGN.md 제안과 같음) |
+| 4 | `store.py` `Store.get` · `Store.delete` | 만료된 키는 없는 키와 똑같이 취급 (`get`은 `None`, `delete`는 `False`, API는 404). `delete`는 남아 있던 항목을 지우고 `False` | 사용하는 쪽에서는 이미 없는 키. `get`을 먼저 불렀는지에 따라 결과가 달라지지 않음 (DESIGN.md 제안과 같음) |
+| 4 | `store.py` `_is_expired` | `지금 >= 만료 시점`이면 만료 | `ttl=5`는 "5초 동안 보관"이므로 정확히 5초가 되는 순간 기간이 끝남 |
+| 4 | `tests/test_store.py` | 4단계 테스트는 `test_store.py`에 추가 | 만료는 `HashTable`이 아니라 `Store`의 일 |
+| 4 | 아직 없음 (6단계에서 `server.py`에 추가) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
