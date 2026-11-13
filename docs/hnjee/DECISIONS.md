@@ -51,3 +51,11 @@
 | 4 | `store.py` `_is_expired` | `지금 >= 만료 시점`이면 만료 | `ttl=5`는 "5초 동안 보관"이므로 정확히 5초가 되는 순간 기간이 끝남 |
 | 4 | `tests/test_store.py` | 4단계 테스트는 `test_store.py`에 추가 | 만료는 `HashTable`이 아니라 `Store`의 일 |
 | 4 | 아직 없음 (6단계에서 `server.py`에 추가) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
+| 5 | `server.py` 맨 아래 (`app.run`) | 서버는 요청마다 스레드를 쓰는 Flask 기본 방식을 유지. 스레드 하나로 바꾸지 않음 | 느린 요청이 다른 요청을 막지 않음. 저장소의 안전은 서버 구조가 아니라 `Store`의 lock이 보장 |
+| 5 | `store.py` `Store.__init__` (`_lock`) | lock은 `Store` 안에서 처리하고, 서버는 lock을 모름 | 저장소를 사용하는 쪽에서 lock을 빠뜨릴 수 없게 함. 만료 확인처럼 여러 단계로 된 동작을 아는 쪽이 `Store` (DESIGN.md 제안과 같음) |
+| 5 | `store.py` `Store.__init__` (`_lock`) | 저장소 전체에 lock 하나. 칸마다 lock을 두지 않음 | resize 때 모든 칸을 잠가야 하고, 칸 수가 바뀌면 lock도 다시 만들어야 함. GIL 때문에 얻는 것도 적음. 명령을 하나씩 실행하는 레디스와 같은 보장 (DESIGN.md 제안과 같음) |
+| 5 | `store.py` `Store.__init__` (`_lock`) | `threading.Lock` 사용 (`RLock` 아님) | lock을 쥔 채로 lock을 거는 `Store` 함수를 다시 부르는 곳이 없음 |
+| 5 | `store.py` `Store.set`, `get`, `delete` | 세 함수의 전체를 `with self._lock:`으로 감쌈. 읽기인 `get`도 포함 | 읽기도 고치는 중간 상태를 볼 수 있음. `get`의 꺼내기 → 만료 확인 → 지우기 사이에 끼어들면 새 값이 지워짐 |
+| 5 | `hash_table.py` | `HashTable`에는 lock을 걸지 않음 | 순수한 자료구조로 둠(2단계 결정). `Store`의 lock 안에서만 불려 안쪽 lock은 아무도 막지 않음 |
+| 5 | `tests/test_store.py` | 동시성 테스트는 `test_store.py`에 추가하고, 테스트 동안 `sys.setswitchinterval(1e-6)`으로 스레드를 자주 교대시킴 | 기본 설정에서는 lock 없이도 20번 모두 통과해 lock의 효과를 확인할 수 없음. 자주 교대하면 lock 없이 20번 모두 깨짐 |
+| 5 | `tests/test_store.py` (완료 테스트 순서) | lock 없는 코드로 동시성 테스트가 깨지는 것을 먼저 본 뒤 lock을 추가 | "lock 덕분에 통과했다"고 말할 수 있음 |
