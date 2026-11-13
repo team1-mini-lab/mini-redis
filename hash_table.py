@@ -1,5 +1,9 @@
+MAX_LOAD_FACTOR = 0.75  # 적재율(키 수 ÷ 칸 수)이 이 값을 넘으면 칸을 늘림
+GROWTH_FACTOR = 2  # 늘릴 때 칸 수에 곱하는 배수
+
+
 class HashTable:
-    """체이닝으로 충돌을 처리하는 해시 테이블. 2단계에서는 칸 수가 고정입니다."""
+    """체이닝으로 충돌을 처리하고, 많이 차면 칸 수를 늘리는 해시 테이블."""
 
     def __init__(self, capacity=8):
         # 칸마다 서로 다른 빈 리스트를 만듦. [[]] * capacity로 만들면 모든 칸이 같은 리스트를 가리킴
@@ -25,6 +29,17 @@ class HashTable:
                 return
         bucket.append((key, value))  # 새 키: 칸의 리스트 끝에 이어 붙임
         self._size += 1
+        if self._size > len(self._buckets) * MAX_LOAD_FACTOR:
+            self._resize()
+
+    def _resize(self):
+        """칸 수를 늘리고, 들어 있던 항목을 새 칸 번호에 다시 배치"""
+        old_buckets = self._buckets
+        self._buckets = [[] for _ in range(len(old_buckets) * GROWTH_FACTOR)]
+        for bucket in old_buckets:
+            for key, value in bucket:
+                # 칸 수가 바뀌었으므로 _index가 새 칸 번호를 돌려줌
+                self._buckets[self._index(key)].append((key, value))
 
     def get(self, key):
         bucket = self._buckets[self._index(key)]
@@ -44,6 +59,11 @@ class HashTable:
 
     def __len__(self):
         return self._size
+
+    @property
+    def capacity(self):
+        """현재 칸 수"""
+        return len(self._buckets)
 
     def dump(self):
         """칸마다 들어 있는 항목을 한 줄씩 보여 주는 문자열"""
