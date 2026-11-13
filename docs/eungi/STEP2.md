@@ -1,226 +1,139 @@
-# 2단계: 해시 테이블 (진행 중)
+# 2단계: 해시 테이블 (구현 완료)
 
 ## 목표
 
-칸 수가 고정된 해시 테이블과 체이닝을 만들고, 임시 저장소의 dict를 교체합니다. (R1, R7)
+`store.py` 안쪽의 dict를 직접 만든 해시 테이블(체이닝)로 바꿈. 서버 코드와 `set`/`get`/`delete` 사용법은 1단계 그대로.
 
-완료 기준:
+- [x] 같은 칸에 여러 키가 이어져도 키로 정확히 찾고 지움
+- [ ] 1단계 curl 확인을 다시 돌려 같은 결과
+- [ ] `dump()`로 칸 상태를 눈으로 확인
 
-- **API 동작이 1단계와 같음**: `store.py` 안쪽만 바꿨으니, 1단계 curl 테스트를 그대로 돌려 같은 결과가 나오면 교체 성공
-- **같은 칸에 여러 키가 이어진 것이 출력으로 확인됨**: 칸 상태를 출력하는 `dump()` 같은 메서드로 한 칸에 `[키, 값]`이 여러 개 들어간 모습을 눈으로 확인
+체이닝은 해시 테이블의 칸(버킷)에 값을 하나만 두는 게 아니라, 연결 리스트로 여러 개를 이어 저장하는 방법.
 
-## 해시 테이블이란
+```
+buckets  (칸 4개)
+[0] → None
+[1] → [ "e" | 5 | ●] → [ "a" | 1 | None ]    ← 같은 칸에 두 키
+[2] → [ "b" | 2 | None ]
+[3] → None
+        key  val next
+```
 
-키를 보고 저장할 위치를 바로 계산하는 자료구조임. 리스트는 처음부터 하나씩 비교해야 하지만, 해시 테이블은 계산된 칸 하나만 보면 됨. 저장할 때와 찾을 때 같은 계산을 하므로 데이터가 많아져도 찾는 시간이 거의 같음.
-
-| 요소 | 역할 | 코드 |
-| --- | --- | --- |
-| 배열(칸들) | 실제로 데이터를 넣는 공간 | `self.buckets = [None] * 4` (체인은 Node) |
-| 해시 함수 | 키를 숫자로 바꿈 | `hash("a")` |
-| 칸 번호 계산 | 숫자를 칸 범위 안으로 맞춤 | `hash("a") % 칸 수` |
-
-## 해시 함수
-
-해시 함수는 정의상 **어떤 입력이든 정수 하나(해시값)로 바꾸는 함수**임. 그래야 그 숫자로 칸 번호를 계산할 수 있음.
+## 구현: `mini_redis/store.py`
 
 ```python
->>> hash("name")
--4177197833195190597     # 문자열 → 숫자 (실행할 때마다 달라짐)
->>> hash(5)
-5                        # 정수는 자기 자신
->>> hash([1, 2])
-TypeError: unhashable type: 'list'   # 바뀔 수 있는 값은 안 됨
+class Node:
+    def __init__(self, key, value, next=None):
+        self.key = key          # 해시값이 아니라 원래 키 (같은 칸 안에서 비교용)
+        self.value = value
+        self.next = next        # 다음 노드, 없으면 None
+
+
+class Store:
+    """해시 테이블 저장소.
+    바깥은 버킷 리스트, 안쪽 체인은 연결 리스트(Node)로 한다.
+    """
+    def __init__(self, capacity=4):
+        self.capacity = capacity              # 칸 개수
+        self.buckets = [None] * capacity      # 각 칸의 첫 노드 (비어 있으면 None)
+        self.size = 0                         # 저장된 키 개수
+
+    def _get_bucket_index(self, key):
+        return hash(key) % self.capacity      # 키 → 칸 번호 (0 ~ capacity-1)
+
+    def set(self, key, value, ttl=None):
+        index = self._get_bucket_index(key)
+        head = self.buckets[index]            # 고정: 원래 첫 노드
+        node = head                           # 이동: 체인을 따라감
+        while node is not None:
+            if node.key == key:               # 같은 키 → 덮어쓰기
+                node.value = value
+                return
+            node = node.next
+        self.buckets[index] = Node(key, value, head)   # 없으면 맨 앞에 삽입
+        self.size += 1
+
+    def get(self, key):
+        index = self._get_bucket_index(key)
+        current = self.buckets[index]
+        while current is not None:
+            if current.key == key:
+                return current.value
+            current = current.next
+        return None                           # 없으면 None (1단계와 같음)
+
+    def delete(self, key):
+        index = self._get_bucket_index(key)
+        prev = None
+        current = self.buckets[index]
+        while current is not None:
+            if current.key == key:            # 1. 찾는 키인가
+                if prev is None:              # 2. 첫 노드인가
+                    self.buckets[index] = current.next
+                else:
+                    prev.next = current.next
+                self.size -= 1
+                return True
+            prev = current                    # 못 찾았을 때만 한 칸 이동
+            current = current.next
+        return False
 ```
 
-지켜야 할 규칙:
+만든 순서: `Node` → `__init__` → `_get_bucket_index` → `set` → `get` → `delete`
 
-- **같은 키는 항상 같은 숫자**: 그래야 저장할 때와 찾을 때 같은 칸으로 감
-- **다른 키는 되도록 다른 숫자**: 완벽할 수는 없어서 충돌이 생김
-
-직접 만든다면 문자 하나하나를 숫자(`ord`)로 바꿔서 섞음:
-
-```python
-def my_hash(key):
-    h = 0
-    for ch in key:
-        h = h * 31 + ord(ch)
-    return h
-```
-
-```
-my_hash("ab") = 97 * 31 + 98 = 3105
-my_hash("ba") = 98 * 31 + 97 = 3135   ← 순서가 달라도 다른 값
-```
-
-- `ord`를 더하기만 하면 `"ab"`와 `"ba"`가 같은 값이 되어 충돌이 많아짐. 그래서 31 같은 수를 곱해 섞음
-- 키는 "비어 있지 않은 문자열"로 정했으니 문자열만 처리하면 됨
-- 내장 `hash()`를 쓸지 직접 만들지는 **미결정**
-
-## 충돌과 체이닝
-
-- 칸은 유한하고 키는 무한하니까 **다른 키가 같은 칸 번호를 받는 일(충돌)**이 반드시 생김. 해시값이 달라도 나머지가 같으면 같은 칸이 됨
-- 체이닝: 각 칸을 리스트로 만들어 충돌한 항목을 뒤에 이어 붙임 (Pintos의 `list_elem`으로 잇는 것과 같은 발상)
-- 각 항목에 키와 값을 함께 저장해야 같은 칸 안에서 키가 일치하는 것을 찾을 수 있음
-
-예시 (칸 4개, 해시값 `"a"=13`, `"b"=6`, `"e"=21`):
-
-```
-set("a", 1)  →  13 % 4 = 1  →  1번 칸
-set("b", 2)  →   6 % 4 = 2  →  2번 칸
-set("e", 5)  →  21 % 4 = 1  →  1번 칸에 이미 "a" → 뒤에 이어 붙임
-
-[0] → []
-[1] → [["a", 1], ["e", 5]]   ← 체이닝
-[2] → [["b", 2]]
-[3] → []
-```
-
-> 정정: 처음에는 "기존에 있는 값에 똑같은 키를 넣으려고 하면 충돌"이라고 적었는데, **같은 키를 다시 저장하는 건 충돌이 아니라 덮어쓰기**임. 충돌은 **다른 키가 같은 칸**에 배정될 때임.
-
-## 충돌 처리 방법 비교
-
-| | 체이닝 | 개방 주소법 |
-| --- | --- | --- |
-| 방식 | 한 칸에 리스트를 두고 이어 붙임 | 한 칸에 하나만, 차 있으면 다른 빈 칸을 찾음 (선형·이차 탐사, 이중 해싱) |
-| 구현 | 쉬움 | 조금 까다로움 |
-| 삭제 | 리스트에서 빼면 끝 | 그냥 비우면 뒤 항목을 못 찾음 → 툼스톤 표시 필요 |
-| 부하율 | 1을 넘어도 동작 | 1을 넘을 수 없음 |
-| 메모리 | 리스트 때문에 추가 공간 | 배열 하나라 메모리·캐시 효율이 좋음 |
-| 실제 사용 | Java HashMap | 파이썬 dict |
-
-팀 결정표대로 체이닝을 씀.
-
-## 고려: 개방 주소법도 쓸 수 있음
-
-- 개방 주소법은 dict 전용 기술이 아니라 충돌을 해결하는 일반적인 방법임. 파이썬 dict는 그 방법을 골라 쓴 예일 뿐이고, 우리도 `list` 하나로 직접 구현할 수 있음
-- 단계별 결정은 개인 자유라서 개방 주소법으로 구현해도 됨. 7단계 비교에서 체이닝과 대비하기 좋음
-
-```
-체이닝: 칸마다 리스트가 하나씩 더 있음        개방 주소법: 칸 하나에 항목 하나
-[1] → [["a",1], ["e",5]]                      [1] ("a", 1)
-[2] → [["b",2]]                               [2] ("e", 5)   ← 1번이 차 있어서 옆 칸으로
-                                              [3] ("b", 2)
-```
-
-- "리스트 때문에 추가 공간"이란 체이닝은 칸마다 작은 리스트 객체가 따로 생긴다는 뜻. 개방 주소법은 배열 하나라 그만큼 가벼움
-- 구현의 핵심은 **툼스톤**: 삭제할 때 칸을 `None`으로 비우면 그 뒤로 밀려난 항목을 못 찾으므로 "지워짐" 표시(`DELETED = object()`)를 남김. 조회는 빈 칸(`None`)을 만나야 "없음"으로 확정함
-
-개방 주소법을 고르면 달라지는 것:
-
-| 단계 | 영향 |
-| --- | --- |
-| 2단계 테스트 | `Store(capacity=1)`로는 키를 하나밖에 못 넣음. 같은 해시값이 나오게 해서 충돌을 만들어야 함 |
-| 2단계 완료 기준 | "같은 칸에 이어진 것" 대신 "옆 칸으로 밀려난 것"을 출력으로 보여 줘야 함 |
-| 3단계 확장 | 선택이 아니라 필수. 칸이 다 차면 더 못 넣음. 보통 부하율 0.5~0.7에서 늘리고, 옮길 때 툼스톤은 버림 |
-| 4단계 만료 | 만료 삭제도 툼스톤을 남김. 툼스톤이 쌓이면 탐색이 길어져 확장 기준에 넣어야 할 수 있음 |
-
-판단: 금요일까지 0~6단계를 마쳐야 하니 체이닝으로 먼저 완성하고, 시간이 남으면 개방 주소법 버전을 따로 만들어 비교해 봄 (**미결정**)
-
-## 무엇을 쓰고 안 쓰나
-
-| 구분 | 사용 여부 |
-| --- | --- |
-| 저장소 안의 `dict`, `set` | 쓰지 않음 (직접 만들 대상) |
-| 파이썬 `list` | 사용 (칸 배열). 체인은 `Node` 연결 리스트로 직접 구현 |
-| `hash()` 내장 함수 | 현재 구현은 사용 중. 계속 쓸지는 **미결정** (팀에 확인) |
-| 서버의 `request.get_json()` 결과 dict | 상관없음 (요청 데이터일 뿐 저장소가 아님) |
-
-- 파이썬의 문자열 `hash()`는 서버를 재시작할 때마다 값이 달라짐. 메모리에만 저장하는 지금 구조에서는 문제없지만 디버깅할 때 칸 번호가 매번 바뀌어 헷갈릴 수 있음
-
-## 구현: 체이닝 + 연결 리스트
-
-처음 계획은 칸마다 `list`를 두고 `[키, 값]`을 append하는 것이었지만, **체인을 `Node`로 직접 잇는 연결 리스트**로 바꿈. 바깥 인터페이스(`set`, `get`, `delete`)는 그대로임.
-
-| 요소 | 코드 | 설명 |
-| --- | --- | --- |
-| 칸 배열 | `self.buckets = [None] * capacity` | 빈 칸은 `None`, 차 있으면 **첫 노드** |
-| 항목 | `Node(key, value, next)` | 키·값·다음 노드를 함께 저장 |
-| 칸 번호 | `_get_bucket_index(key)` → `hash(key) % self.capacity` | 세 메서드가 같이 쓰는 내부용 헬퍼 |
-| 항목 수 | `self.size` | 새 키 `set`일 때 +1, 실제로 지웠을 때 −1 (3단계 부하율에 씀) |
-
-```
-buckets[1] → [ "e" | 5 | ●] → [ "a" | 1 | None ]
-              key  val next     key  val next
-```
-
-| 메서드 | 동작 |
-| --- | --- |
-| `set` | 체인을 돌다 같은 키가 있으면 `value`만 바꾸고 끝. 없으면 **맨 앞에** 삽입: `Node(key, value, head)` |
-| `get` | 같은 키면 `value` 반환, 끝까지 없으면 `None` |
-| `delete` | `prev`, `current` 두 변수로 순회. 찾으면 **`current`를 가리키던 화살표를 `current.next`로** 바꾸고 `size −1`, `True`. 없으면 `False` |
-
-`delete`의 핵심 (첫 노드면 칸을, 아니면 앞 노드의 `next`를 바꿈):
-
-```python
-if current.key == key:          # 1. 먼저 찾는 키인지
-    if prev is None:            # 2. 그다음 첫 노드인지
-        self.buckets[index] = current.next
-    else:
-        prev.next = current.next
-    self.size -= 1
-    return True
-prev = current                  # 못 찾았을 때만 한 칸 이동 (prev 먼저)
-current = current.next
-```
-
-## 공부하며 정리한 것
-
-- **노드에는 해시값이 아니라 원래 키를 저장**: 같은 칸에 다른 키가 섞이므로 키로 비교해야 함. 해시값만 두면 해시값이 같은 다른 키를 구분 못 함
-- **반복문이 끝나면 움직이던 변수는 `None`**: 그래서 `set`에서 새 노드의 `next`로 쓸 첫 노드는 `head`에 따로 저장해 둠 (`head` = 고정, `node`/`current` = 이동)
-- **맨 앞 삽입**: 첫 노드만 바꾸면 돼서 한 번에 끝남. 해시 테이블은 키로 찾으니 체인 안 순서는 상관없음
-- **삭제는 노드를 없애는 게 아니라 화살표를 건너뛰게 바꾸는 것**: 연결 리스트는 뒤로 못 가니 앞 노드(`prev`)를 기억해야 함. 끝 노드를 지울 때는 `current.next`가 `None`이라 따로 처리할 필요 없음
-- **`if` 순서**: "찾는 키인가?"를 먼저, "첫 노드인가?"를 나중에. 반대로 하면 `prev`가 `None`일 때 `prev.next`에서 오류
-- **`self.`**: 객체의 속성·메서드를 꺼낼 때 붙임. `index`, `current` 같은 메서드 안 임시 변수에는 안 붙임
-- **밑줄 `_` 하나**: "내부용" 관례(막지는 않음). 정의한 이름과 부르는 이름의 밑줄 개수가 다르면 다른 이름이 됨
-- **대문자 `Node`는 클래스 이름**: 변수로 쓰면 안 됨. `while Node is not None`은 항상 참이라 없는 키 조회 때 오류
-- **`capacity=1` 테스트가 중요한 이유**: 칸이 많으면 체인 길이가 1이라 `delete`의 `else`(중간·끝 삭제)가 한 번도 실행되지 않아 버그가 숨음
-
-## 현재 상태
-
-- `store.py`를 해시 테이블로 교체함. 직접 만든 assert 테스트 통과:
-  - `capacity=1`에 a, b, c → 덮어쓰기 후에도 `size` 3, 없는 키 `None`
-  - 중간(b) → 끝(a) → 첫(c) 삭제, 같은 키 두 번 삭제 시 `False`, 칸이 `None`으로 돌아옴
-  - `capacity=4`에 키 20개 넣고 모두 정확히 조회
-- 구현의 이름(`buckets`, `_get_bucket_index`)을 기준으로 테스트를 고침 (테스트는 원래 `_buckets`, `_index`를 가정)
-- 테스트는 칸을 list로 가정했으므로, 두 테스트 파일에 체인을 따라가며 `(키, 값)` 목록을 만드는 `_chain(bucket)` 헬퍼를 추가하고 `len(bucket)`, `for item in bucket`을 `_chain(bucket)`으로 바꿈. 테스트가 확인하는 내용은 그대로
-- `python -m pytest -v` → **71개 모두 통과** (test_store 3 + test_collision 68)
-- 테스트가 쓸모 있는지 확인: `delete`의 `prev.next = current.next`를 `None`으로 망가뜨리면 64개 실패
-- 남은 일:
-  - [ ] `dump()` 구현 (완료 기준 2). `_chain`과 같은 순회를 쓰면 됨
-  - [ ] 1단계 curl 테스트 다시 실행 (완료 기준 1)
-
-## 테스트 (`tests/test_store.py`)
-
-모든 키를 한 칸에 몰아(`Store(capacity=1)`) 체이닝을 확인함. 서버 없이 Store만 테스트함.
-
-| 테스트 | 확인하는 것 |
-| --- | --- |
-| `test_all_keys_in_one_bucket` | 3개가 한 칸에 들어가고, 같은 칸에서도 키로 정확히 찾음 |
-| `test_overwrite_in_chain` | 같은 키는 추가가 아니라 덮어쓰기 (항목 수 그대로) |
-| `test_delete_middle_of_chain` | 가운데 항목을 지워도 앞뒤 항목을 잘 찾음 |
-
-### 충돌을 여러 번 만드는 테스트 (`tests/test_collision.py`)
-
-테스트 4개를 칸 수와 무작위 시드 조합으로 돌려 **총 68번** 실행됨.
-
-| 테스트 | 충돌을 만드는 방법 |
-| --- | --- |
-| `test_real_collision_with_normal_capacity` | 칸 8개인 평소 상태에서 같은 칸 번호를 받는 키 5개를 직접 찾아 넣음 (진짜 충돌) |
-| `test_more_keys_than_buckets` | 칸 1~4개에 키 50개. 칸보다 키가 많으니 충돌이 반드시 생김 (비둘기집 원리) |
-| `test_delete_every_position_in_chain` | 체인의 앞, 가운데, 끝을 번갈아 지우며 매번 체인 전체 검사 |
-| `test_random_operations_match_dict` | 무작위 set/get/delete 500번을 dict와 똑같이 해서 결과 비교. 시드 20개 × 칸 1/3/8개 |
-
-- 매번 체인 전체를 훑어 **같은 키가 두 번 들어 있지 않은지, 키가 엉뚱한 칸에 있지 않은지** 확인함
-- dict는 정답 비교용으로만 쓰고 저장소에는 쓰지 않음
-- 테스트가 쓸모 있는지 확인: 올바른 체이닝 구현은 68개 모두 통과, `delete`가 엉뚱한 항목을 지우도록 망가뜨리면 63개 실패 → 버그를 잡아냄
-- 구현과 테스트 모두 `buckets`, `_get_bucket_index(key)` 이름을 씀
-
-현재 상태: **모두 통과 (Green)**. 연결 리스트 구현에 맞게 `_chain(bucket)` 헬퍼로 체인을 읽도록 고침.
+## 완료 확인
 
 ```bash
-python -m pytest -v
+python -m pytest -v    # 2개 통과
 ```
+
+서버까지 확인할 때는 1단계 curl 순서를 그대로 씀 (`flask --app mini_redis.server run --port 5001 --debug`).
+
+## 짜면서 막혔던 것
+
+### `Node`
+
+- 처음엔 `Class Node:`에 `__init__(self)`만 있고 `self.key = self.value = self.next = None` → 키워드는 소문자 `class`, 만들 때 바로 넣을 수 있게 `key, value, next=None`을 받음. 기본값 있는 인자는 맨 뒤
+- 노드에 `hash(key)`를 저장해야 하나? → 아님. 해시는 칸 번호 구할 때만 씀. 같은 칸에 다른 키가 섞이니까 원래 키로 비교해야 함. 해시값이 같은 다른 키도 구분 가능
+
+### 칸 번호 헬퍼
+
+- `hash(key) % self.capacity return` → `return`이 앞에 와야 함
+- `__get_bucket_index(self, key)`로 호출 → 정의한 이름은 밑줄 하나. 그리고 메서드는 `self._get_bucket_index(key)`로 부르고 괄호 안에 `self`를 안 넣음
+
+### `set` (제일 오래 걸림)
+
+- 1단계 `self._data`가 남아 있었음 → 이제 `self.buckets[index]`가 그 칸의 첫 노드
+- `if index == key` → 칸 번호와 키를 비교하고 있었음 → `node.key == key`
+- `self.value = value` → `self`는 Store 전체, 값은 노드에 있음 → `node.value`
+- `Node(key, value, ttl)` → `Node(key, value, next)` → 세 번째 칸은 다음 노드 자리. `next`는 내장 함수 → 원래 첫 노드를 넣어야 함
+- 앞에서 `self.buckets[index]`를 구했는데 왜 마지막에 또 쓰나? → 반복문이 끝나면 `node`는 항상 `None`. `node`를 넣으면 기존 체인이 끊김 → 그래서 처음에 `head`로 따로 저장해 둠
+- 항상 맨 앞에 넣나? → 새 키일 때만. 첫 노드만 바꾸면 돼서 간단하고, 키로 찾으니 순서는 상관없음
+
+### `get`
+
+- `head`에 넣고 `node`로 꺼냄 → 이름이 다르면 다른 변수. 움직이는 변수는 `current` 하나로 통일 (`head`는 움직이지 않는 첫 노드에만)
+- `return node.key` → 키를 주고 키를 받으면 의미 없음 → `current.value`
+- 반복문 밖 `return node.key` → 그때 `node`는 `None`이라 오류 → `return None`
+- `while Node is not None` → 대문자 `Node`는 클래스라 항상 참 → 소문자 변수
+
+### `delete`
+
+- 삭제 = 노드를 없애는 게 아니라 `current`를 가리키던 화살표가 `current.next`를 가리키게 바꾸는 것
+  - 첫 노드면 `self.buckets[index]`, 아니면 `prev.next`를 바꿈
+- 연결 리스트는 뒤로 못 감 → 앞 노드를 `prev`로 들고 다녀야 함. 처음엔 앞이 없으니 `prev = None`
+- `if prev is None`을 바깥에 둠 → 첫 노드가 찾는 키가 아니면 `prev.next`에서 오류 → "찾는 키인가"가 먼저, "첫 노드인가"가 나중
+- `self.buckets[index] = current` → 지울 노드를 다시 넣은 것 → `current.next`
+- 끝 노드는? → `current.next`가 `None`이라 `prev.next = None`이 되고 자연스럽게 끝남
+
+## 내가 이해한 것
+
+- `self.` → 이 객체 안의 것을 꺼낼 때 붙임. `index`, `current`처럼 메서드 안에서만 쓰는 변수에는 안 붙음
+- `_` 하나 → "내부용" 표시 (막지는 않음)
+- 칸이 많으면 체인 길이가 1이라 `delete`의 `else`(중간·끝 삭제)가 실행되지 않음 → 그래서 `capacity=1`로 테스트
+- 해시 함수는 지금 내장 `hash()`를 씀. 문자열은 실행할 때마다 값이 달라지지만 메모리에만 저장하니 문제없음 (직접 만들지는 팀에 확인)
+- 체이닝 vs 개방 주소법: 개방 주소법은 한 칸에 하나만 두고 차 있으면 옆 칸을 찾음. 삭제할 때 툼스톤이 필요해서 체이닝이 더 단순함
 
 ## 다음 단계
 
-칸 수가 고정이라 항목이 많아지면 체인이 길어짐 (지금 `capacity=4`에 키 20개면 칸당 평균 5개). 부하율과 재해싱은 [STEP3.md](./STEP3.md)에 정리함.
+칸 수가 고정이라 키가 많아지면 체인이 길어짐 → 3단계 칸 수 확장. [STEP3.md](./STEP3.md)
