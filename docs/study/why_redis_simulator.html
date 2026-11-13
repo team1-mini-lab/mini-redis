@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>로컬 캐시 vs 레디스 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#ECEFF3; --panel:#FFFFFF; --ink:#18202B; --sub:#55606E; --line:#CBD2DB;
+  --blue:#2457A6; --bluebg:#E1EAF7; --red:#B9362B; --redbg:#F8E3E0;
+  --redis:#B9362B; --chip:#E3E7EC; --focus:#2457A6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#11161D; --panel:#1A212B; --ink:#E7ECF2; --sub:#9AA6B4; --line:#2E3946;
+    --blue:#7FA7E6; --bluebg:#1C2B42; --red:#F08A7E; --redbg:#3A1F1C;
+    --redis:#F08A7E; --chip:#252E3A; --focus:#7FA7E6;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#11161D; --panel:#1A212B; --ink:#E7ECF2; --sub:#9AA6B4; --line:#2E3946;
+  --blue:#7FA7E6; --bluebg:#1C2B42; --red:#F08A7E; --redbg:#3A1F1C;
+  --redis:#F08A7E; --chip:#252E3A; --focus:#7FA7E6;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*,*::before,*::after{box-sizing:inherit;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Noto Sans KR",sans-serif;font-size:15px;line-height:1.55;word-break:keep-all;}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 48px;}
+h1{font-size:28px;line-height:1.25;margin:0 0 6px;font-weight:700;}
+.lede{color:var(--sub);margin:0 0 22px;max-width:62ch;}
+button{font:inherit;color:inherit;cursor:pointer;}
+button:focus-visible{outline:3px solid var(--focus);outline-offset:2px;}
+.topbar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.mode{display:inline-flex;background:var(--chip);border-radius:10px;padding:4px;gap:4px;}
+.mode button{border:0;background:transparent;padding:8px 16px;border-radius:7px;font-weight:600;color:var(--sub);}
+.mode button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 0 0 1px var(--line);}
+.reset{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.tabs [role="tab"]{border:1px solid var(--line);background:var(--panel);padding:8px 14px;border-radius:8px;font-weight:500;}
+.tabs [role="tab"][aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+.layout{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:18px;align-items:start;}
+@media (max-width:880px){.layout{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;}
+.scenario h2{font-size:18px;margin:0 0 6px;}
+.scenario p{margin:0 0 12px;color:var(--sub);}
+.scenario .watch{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:14px;}
+.actions{display:flex;flex-direction:column;gap:8px;margin:14px 0;}
+.actions button{border:1px solid var(--blue);background:var(--bluebg);padding:10px 12px;border-radius:9px;text-align:left;font-weight:500;}
+.who{font-size:12px;color:var(--sub);display:block;font-weight:400;}
+.topo{display:flex;flex-direction:column;gap:10px;}
+.tier{display:flex;justify-content:center;}
+.node{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 14px;font-weight:600;text-align:center;}
+.node.lb{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+.down{width:2px;height:16px;background:var(--line);margin:0 auto;}
+.servers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.srv{border:2px solid var(--line);border-radius:12px;padding:12px;background:var(--panel);min-height:150px;transition:border-color .2s;}
+.srv h3{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.srv .tag{font-size:11px;font-weight:500;color:var(--sub);}
+.srv.stale{border-color:var(--red);background:var(--redbg);}
+.srv.active{border-color:var(--blue);}
+.srv.restarting{opacity:.45;}
+.mem{display:flex;flex-direction:column;gap:4px;font-size:13px;}
+.kv{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:3px 0;}
+.kv span:last-child{font-family:"IBM Plex Mono",ui-monospace,monospace;font-weight:600;text-align:right;}
+.empty{color:var(--sub);font-size:13px;}
+.redisbox{border:2px solid var(--redis);border-radius:12px;padding:12px;background:var(--panel);}
+.redisbox h3{margin:0 0 8px;font-size:15px;color:var(--redis);}
+.redisbox .mem{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px;}
+.dbbox{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--chip);}
+.dbbox h3{margin:0 0 8px;font-size:15px;}
+.dbbox .mem{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:16px;}
+@media (max-width:560px){.dbbox .mem,.redisbox .mem{grid-template-columns:1fr;}.servers{grid-template-columns:1fr;}}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px;}
+.stat{background:var(--chip);border-radius:10px;padding:10px 12px;}
+.stat b{display:block;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:22px;}
+.stat small{color:var(--sub);}
+.result{margin-top:14px;border-radius:10px;padding:12px 14px;font-weight:600;display:none;}
+.result.show{display:block;}
+.result.bad{background:var(--redbg);color:var(--red);}
+.result.good{background:var(--bluebg);color:var(--blue);}
+.result.neutral{background:var(--chip);color:var(--ink);}
+.log{margin-top:18px;}
+.log h2{font-size:16px;margin:0 0 8px;}
+.log ol{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto;font-size:13px;}
+.log li{padding:6px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;}
+.log li .n{color:var(--sub);font-family:"IBM Plex Mono",ui-monospace,monospace;min-width:28px;}
+.log li.bad{color:var(--red);}
+.log li.good{color:var(--blue);}
+@keyframes ping{from{box-shadow:0 0 0 0 var(--blue);}to{box-shadow:0 0 0 10px transparent;}}
+.srv.ping{animation:ping .6s ease-out;}
+@media (prefers-reduced-motion: reduce){.srv.ping{animation:none;}.srv{transition:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>로컬 캐시 vs 레디스, 직접 눌러 보기</h1>
+  <p class="lede">정글마켓 서버 A·B·C 앞에 로드밸런서가 있고, 요청은 A → B → C 순서로 돌아가며 들어갑니다. 위에서 방식을 바꿔 가며 같은 버튼을 눌러 보세요.</p>
+  <div class="topbar">
+    <div class="mode" role="group" aria-label="캐시 방식">
+      <button type="button" data-mode="local" aria-pressed="true">로컬 캐시 (서버 메모리)</button>
+      <button type="button" data-mode="redis" aria-pressed="false">레디스 (공용 저장소)</button>
+    </div>
+    <button type="button" class="reset" id="reset">처음 상태로</button>
+  </div>
+  <div class="tabs" role="tablist" aria-label="장면">
+    <button role="tab" data-s="1" aria-selected="true">① 가격</button>
+    <button role="tab" data-s="2" aria-selected="false">② 로그인</button>
+    <button role="tab" data-s="3" aria-selected="false">③ 배포</button>
+    <button role="tab" data-s="4" aria-selected="false">④ 중복</button>
+    <button role="tab" data-s="5" aria-selected="false">⑤ 재고</button>
+  </div>
+  <div class="layout">
+    <div class="panel scenario" id="scenario" role="tabpanel"></div>
+    <div class="panel">
+      <div class="topo">
+        <div class="tier"><div class="node">고객 · 관리자</div></div>
+        <div class="down"></div>
+        <div class="tier"><div class="node lb" id="lb">로드밸런서</div></div>
+        <div class="down"></div>
+        <div class="servers" id="servers"></div>
+        <div class="down"></div>
+        <div id="redisWrap"></div>
+        <div class="dbbox" id="db"></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="stDb">0</b><small>DB 조회 수</small></div>
+        <div class="stat"><b id="stCopies">0</b><small>캐시에 저장된 상품 수 (전체)</small></div>
+        <div class="stat"><b id="stOrders">0</b><small>DB에 들어간 주문 수</small></div>
+      </div>
+      <div class="result" id="result" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+  <div class="panel log">
+    <h2>요청 기록</h2>
+    <ol id="log"></ol>
+  </div>
+</div>
+<script>
+const PRODUCTS = ['키보드','마우스','모니터','헤드셋','웹캠','스피커','충전기','허브','거치대','패드'];
+const won = n => n.toLocaleString('ko-KR') + '원';
+let S, mode = 'local', scene = 1, logN = 0;
+
+function fresh(){
+  return {
+    rr: 0,
+    servers: ['A','B','C'].map(n => ({ name:n, cache:{}, sessions:{}, stock:null, restarting:false })),
+    redis: { cache:{}, sessions:{}, stock:null },
+    db: { price:{ 키보드:50000 }, stock:0, queries:0, orders:0 }
+  };
+}
+function basePrice(p){ return S.db.price[p] ?? 30000 + PRODUCTS.indexOf(p) * 1000; }
+function nextServer(){ const s = S.servers[S.rr]; S.rr = (S.rr + 1) % 3; return s; }
+function readPrice(srv, p){
+  const store = mode === 'local' ? srv.cache : S.redis.cache;
+  if (store[p] !== undefined) return { v: store[p], hit: true };
+  S.db.queries++;
+  store[p] = basePrice(p);
+  return { v: store[p], hit: false };
+}
+
+const A = {
+  view(){
+    const s = nextServer(); const r = readPrice(s, '키보드');
+    const stale = r.v !== basePrice('키보드');
+    const src = r.hit
+      ? (mode === 'local' ? `서버 ${s.name} 자기 메모리에서 바로, DB 안 감` : '레디스에서 바로, DB 안 감')
+      : (mode === 'local' ? `DB에서 가져와 서버 ${s.name} 메모리에 저장` : 'DB에서 가져와 레디스에 저장');
+    log(`고객 → 서버 ${s.name}: 키보드 ${won(r.v)} (${src})${stale ? ' · 옛 가격' : ''}`, stale ? 'bad' : '');
+    ping(s);
+    result(stale ? `서버 ${s.name}는 아직 옛 가격 ${won(r.v)}을 보여 줍니다. DB는 ${won(basePrice('키보드'))}인데, 서버 ${s.name}의 메모리는 그 사실을 모릅니다.` : '', 'bad');
+  },
+  discount(){
+    const s = nextServer();
+    const np = Math.max(20000, basePrice('키보드') - 10000);
+    S.db.price['키보드'] = np; S.db.queries++;
+    if (mode === 'local'){ s.cache['키보드'] = np; log(`관리자 → 서버 ${s.name}: 가격 ${won(np)}으로 변경. DB 수정 + 서버 ${s.name} 캐시만 갱신`); }
+    else { delete S.redis.cache['키보드']; log(`관리자 → 서버 ${s.name}: 가격 ${won(np)}으로 변경. DB 수정 + 레디스 키 삭제 (DEL)`, 'good'); }
+    ping(s); result('', '');
+  },
+  login(){
+    const s = nextServer();
+    (mode === 'local' ? s.sessions : S.redis.sessions)['abc'] = 'kim';
+    log(`kim → 서버 ${s.name}: 로그인. 세션을 ${mode === 'local' ? '서버 ' + s.name + ' 메모리' : '레디스'}에 저장`);
+    ping(s); result('', '');
+  },
+  mypage(){
+    const s = nextServer();
+    const ok = (mode === 'local' ? s.sessions : S.redis.sessions)['abc'] === 'kim';
+    log(`kim → 서버 ${s.name}: 마이페이지 → ${ok ? '“kim님 마이페이지”' : '“로그인하세요”'}`, ok ? 'good' : 'bad');
+    ping(s);
+    result(ok ? `서버 ${s.name}도 kim을 알아봅니다.` : `서버 ${s.name}에는 kim의 세션이 없어서 로그인이 풀렸습니다.`, ok ? 'good' : 'bad');
+  },
+  traffic(){ burst('평소 트래픽'); },
+  deploy(){
+    S.servers.forEach(s => { s.cache = {}; s.sessions = {}; s.stock = null; s.restarting = true; });
+    log(mode === 'local' ? '배포: 서버 A·B·C 재시작 → 각 서버의 메모리(캐시·세션)가 모두 비었습니다' : '배포: 서버 A·B·C 재시작 → 앱 서버는 비었지만 레디스는 그대로입니다', mode === 'local' ? 'bad' : 'good');
+    render();
+    setTimeout(() => { S.servers.forEach(s => s.restarting = false); burst('배포 직후 트래픽'); }, 450);
+  },
+  fill(){
+    const before = S.db.queries;
+    if (mode === 'local') S.servers.forEach(s => PRODUCTS.forEach(p => readPrice(s, p)));
+    else PRODUCTS.forEach(p => readPrice(S.servers[0], p));
+    const q = S.db.queries - before;
+    log(`인기 상품 10개 캐시 채우기 → DB 조회 ${q}번`, mode === 'local' && q > 10 ? 'bad' : 'good');
+    result(mode === 'local'
+      ? `같은 상품 10개를 서버마다 따로 채웠습니다. DB 조회 ${q}번, 저장된 사본 ${copies()}개. 서버가 10대면 10배가 됩니다.`
+      : `레디스에 한 벌만 채웠습니다. DB 조회 ${q}번, 저장된 사본 ${copies()}개. 서버가 몇 대든 그대로입니다.`, mode === 'local' ? 'bad' : 'good');
+  },
+  restock(){
+    S.db.stock = 1; S.db.orders = 0;
+    if (mode === 'local'){ S.servers.forEach(s => { s.stock = 1; }); log('한정판 키보드 1개 입고 → 서버 A·B·C가 각자 재고 1개를 메모리에 들고 있음'); }
+    else { S.redis.stock = 1; log('한정판 키보드 1개 입고 → 레디스에 stock = 1 (SET)'); }
+    result('', '');
+  },
+  race(){
+    if ((mode === 'local' && S.servers[0].stock === null) || (mode === 'redis' && S.redis.stock === null)){
+      result('먼저 “한정판 1개 입고”를 눌러 주세요.', 'neutral'); return;
+    }
+    S.rr = 0;
+    const a = nextServer(), b = nextServer();
+    let sold = 0;
+    [['kim', a], ['lee', b]].forEach(([who, s]) => {
+      if (mode === 'local'){
+        if (s.stock > 0){ s.stock--; S.db.orders++; sold++; log(`${who} → 서버 ${s.name}: 재고 확인 1개 → 주문 성공`, 'bad'); }
+        else log(`${who} → 서버 ${s.name}: 재고 없음`);
+      } else {
+        S.redis.stock--; const left = S.redis.stock;
+        if (left >= 0){ S.db.orders++; sold++; log(`${who} → 서버 ${s.name}: DECR → 남은 재고 ${left} → 주문 성공`, 'good'); }
+        else { S.redis.stock++; log(`${who} → 서버 ${s.name}: DECR → ${left} (0 미만) → 주문 취소, 재고 되돌림`, 'good'); }
+      }
+    });
+    S.db.stock = Math.max(0, 1 - sold);
+    ping(a); ping(b);
+    result(sold > 1
+      ? `재고는 1개인데 ${sold}명에게 팔았습니다. 각 서버가 자기 메모리에 있는 재고만 봤기 때문입니다.`
+      : (sold === 1 ? '1개를 정확히 한 명에게만 팔았습니다. 모두가 레디스의 같은 재고 키를 보고, DECR은 한 명령이라 중간에 끼어들 틈이 없습니다.' : '재고가 없어 아무도 사지 못했습니다. “입고”를 다시 눌러 보세요.'),
+      sold > 1 ? 'bad' : 'good');
+  }
+};
+
+function burst(label){
+  const before = S.db.queries;
+  for (let i = 0; i < 30; i++){ const s = nextServer(); readPrice(s, PRODUCTS[i % 10]); }
+  const q = S.db.queries - before;
+  const deploy = label.startsWith('배포');
+  log(`${label} 30건 → 그중 DB로 간 요청 ${q}건`, q > 10 ? 'bad' : (q === 0 ? 'good' : ''));
+  if (deploy) result(mode === 'local'
+      ? `배포 직후 30건 중 ${q}건이 DB로 몰렸습니다. 세 서버의 캐시가 동시에 비었기 때문입니다.`
+      : `배포 직후에도 30건 중 ${q}건만 DB로 갔습니다. 캐시가 앱 밖(레디스)에 있어서 재시작과 상관없습니다.`, mode === 'local' && q > 10 ? 'bad' : 'good');
+  else result(`30건 중 ${q}건이 DB로 갔습니다. 한 번 더 누르면 캐시가 데워져서 거의 0건이 됩니다.`, 'neutral');
+  render();
+}
+
+const SCENES = {
+  1: { t:'① 새로고침할 때마다 가격이 바뀐다', d:'관리자가 할인을 걸면, 그 요청을 받은 서버 하나만 자기 캐시를 고칩니다.',
+       w:'“상품 조회”를 3번 눌러 세 서버를 모두 채운 뒤 “할인”을 누르고, 다시 “상품 조회”를 여러 번 눌러 보세요. 빨간 서버가 옛 가격을 들고 있는 서버입니다.',
+       a:[['view','상품 조회','고객'],['discount','가격 10,000원 할인','관리자']] },
+  2: { t:'② 로그인했는데 다음 클릭에서 풀린다', d:'로그인 기록(세션)이 로그인 요청을 받은 서버의 메모리에만 남습니다.',
+       w:'“로그인”을 한 번 누른 뒤 “마이페이지”를 여러 번 눌러 보세요. 다른 서버로 가면 로그인이 풀립니다.',
+       a:[['login','로그인','고객 kim'],['mypage','마이페이지 열기','고객 kim']] },
+  3: { t:'③ 배포할 때마다 DB가 휘청인다', d:'재시작하면 프로세스 메모리가 날아가 캐시가 동시에 비고, 요청이 DB로 몰립니다.',
+       w:'“평소 트래픽”을 두 번 눌러 캐시를 데운 뒤 “배포”를 눌러 보세요. DB로 간 요청 수를 두 방식에서 비교하세요.',
+       a:[['traffic','평소 트래픽 30건','고객들'],['deploy','배포 (서버 전체 재시작)','운영자']] },
+  4: { t:'④ 값이 같아도 낭비다', d:'①②와 같은 구조 그대로입니다. 아무것도 고치지 않았고, 서버마다 같은 데이터를 각자 DB에서 가져와 따로 저장합니다.',
+       w:'“처음 상태로”를 누른 뒤 “캐시 채우기”를 눌러 보세요. DB 조회 수와 저장된 사본 수를 두 방식에서 비교하세요.',
+       a:[['fill','인기 상품 10개 캐시 채우기','서버들']] },
+  5: { t:'⑤ 함께 세야 하는 값은 만들 수 없다', d:'재고처럼 모든 서버가 같은 값을 봐야 하는 기능은 서버 메모리로는 만들 수 없습니다.',
+       w:'“입고”를 누른 뒤 “동시 구매”를 눌러 보세요. kim은 서버 A, lee는 서버 B로 갑니다.',
+       a:[['restock','한정판 1개 입고','관리자'],['race','kim과 lee가 동시에 구매','고객 2명']] }
+};
+
+function renderScene(){
+  const sc = SCENES[scene], el = document.getElementById('scenario');
+  el.innerHTML = `<h2>${sc.t}</h2><p>${sc.d}</p>
+    <div class="actions">${sc.a.map(([k, l, w]) => `<button type="button" data-act="${k}">${l}<span class="who">${w}</span></button>`).join('')}</div>
+    <div class="watch">${sc.w}</div>`;
+  el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { A[b.dataset.act](); render(); });
+}
+function copies(){
+  if (mode === 'local') return S.servers.reduce((n, s) => n + Object.keys(s.cache).length, 0);
+  return Object.keys(S.redis.cache).length;
+}
+function memRows(cache, sessions, stock){
+  const rows = [];
+  if (cache['키보드'] !== undefined) rows.push(['키보드 가격', won(cache['키보드'])]);
+  const others = Object.keys(cache).filter(k => k !== '키보드').length;
+  if (others) rows.push(['다른 상품', others + '개']);
+  if (sessions['abc']) rows.push(['세션 abc', sessions['abc']]);
+  if (stock !== null && stock !== undefined) rows.push(['재고', stock + '개']);
+  return rows.length ? rows.map(([k, v]) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`).join('') : '<div class="empty">비어 있음</div>';
+}
+function render(){
+  const truth = basePrice('키보드');
+  document.getElementById('servers').innerHTML = S.servers.map(s => {
+    const stale = mode === 'local' && s.cache['키보드'] !== undefined && s.cache['키보드'] !== truth;
+    const body = mode === 'local' ? memRows(s.cache, s.sessions, s.stock) : '<div class="empty">상태 없음 · 코드만 실행</div>';
+    return `<div class="srv${stale ? ' stale' : ''}${s.restarting ? ' restarting' : ''}" id="srv-${s.name}">
+      <h3>서버 ${s.name}<span class="tag">${s.restarting ? '재시작 중' : (mode === 'local' ? '자기 메모리' : '')}</span></h3>
+      <div class="mem">${body}</div></div>`;
+  }).join('');
+  document.getElementById('redisWrap').innerHTML = mode === 'redis'
+    ? `<div class="redisbox"><h3>레디스 · 모든 서버가 함께 보는 곳</h3><div class="mem">${memRows(S.redis.cache, S.redis.sessions, S.redis.stock)}</div></div><div class="down"></div>`
+    : '';
+  document.getElementById('db').innerHTML = `<h3>DB · 원본</h3><div class="mem">
+    <div class="kv"><span>키보드 가격</span><span>${won(truth)}</span></div>
+    <div class="kv"><span>한정판 재고</span><span>${S.db.stock}개</span></div>
+    <div class="kv"><span>주문</span><span>${S.db.orders}건</span></div></div>`;
+  document.getElementById('lb').textContent = `로드밸런서 · 다음 요청은 서버 ${S.servers[S.rr].name}`;
+  document.getElementById('stDb').textContent = S.db.queries;
+  document.getElementById('stCopies').textContent = copies();
+  document.getElementById('stOrders').textContent = S.db.orders;
+}
+function ping(s){
+  requestAnimationFrame(() => {
+    const el = document.getElementById('srv-' + s.name);
+    if (!el) return;
+    el.classList.remove('ping'); void el.offsetWidth; el.classList.add('ping', 'active');
+    setTimeout(() => el.classList.remove('active'), 700);
+  });
+}
+function log(msg, cls){
+  const li = document.createElement('li'); if (cls) li.className = cls;
+  const n = document.createElement('span'); n.className = 'n'; n.textContent = ++logN;
+  const t = document.createElement('span'); t.textContent = msg;
+  li.append(n, t); document.getElementById('log').prepend(li);
+}
+function result(msg, cls){
+  const r = document.getElementById('result');
+  r.className = 'result' + (msg ? ' show ' + cls : ''); r.textContent = msg;
+}
+function reset(keepLog){
+  S = fresh(); result('', '');
+  if (!keepLog){ document.getElementById('log').innerHTML = ''; logN = 0; }
+  render();
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode;
+  document.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  reset(true);
+  log(mode === 'local' ? '방식 변경: 로컬 캐시 (각 서버 메모리), 상태를 처음으로 되돌림' : '방식 변경: 레디스 (서버 밖 공용 저장소), 상태를 처음으로 되돌림');
+});
+document.querySelectorAll('[role="tab"]').forEach(t => t.onclick = () => {
+  scene = +t.dataset.s;
+  document.querySelectorAll('[role="tab"]').forEach(x => x.setAttribute('aria-selected', String(x === t)));
+  renderScene();
+});
+document.getElementById('reset').onclick = () => reset(false);
+reset(false); renderScene();
+</script>
+</body>
+</html>
