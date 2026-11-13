@@ -24,6 +24,22 @@ class Store:
             node = node.next
         self.buckets[index] = Node(key, value, head)
         self.size += 1
+        if self.size / self.capacity > 0.75:                
+            self._resize()
+    def _resize(self):
+        old_buckets = self.buckets                    
+        self.capacity = self.capacity *2          
+        self.buckets = [None] * self.capacity           
+
+        for old_head in old_buckets:            
+            current = old_head
+            while current is not None:
+                next_node = current.next
+                index = self._get_bucket_index(current.key)
+                new_head = self.buckets[index]
+                current.next = new_head
+                self.buckets[index] = current   
+                current = next_node
 
     def _get_bucket_index(self, key):
         return hash(key) % self.capacity
@@ -75,3 +91,10 @@ if __name__ == "__main__":
     assert s.size == 0
 
     print("모든 테스트 통과!")
+
+    s = Store()                # capacity 4로 시작
+    for i in range(100):
+        s.set(f"k{i}", i)
+    print(s.capacity, s.size)  # 256 100 이 나오면 정상
+    assert all(s.get(f"k{i}") == i for i in range(100))
+    print("3단계 통과!")
