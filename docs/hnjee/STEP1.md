@@ -39,8 +39,8 @@ store.py   (HTTP를 모르는 쪽)    값을 넣고, 꺼내고, 지움
 | `server.py` `delete_value` · `store.py` `Store.delete` | 없는 키를 삭제하면 `delete`는 `False`, API는 200 `{"deleted": false}` | 삭제의 목적은 "값이 없는 상태"이므로 이미 없어도 실패가 아님. 실제로 지웠는지는 본문으로 알림 (DESIGN.md 제안과 같음) |
 | `store.py` `Store.set` | 이미 있는 키에 `set`을 하면 값을 덮어씀 | 캐시 값을 갱신하는 기본 동작 (DESIGN.md 제안과 같음) |
 | `store.py` `Store.set` | `set`의 `ttl` 인자는 4단계에서 추가 | 1단계에서 받기만 하고 무시하면 동작하는 것처럼 보여 혼란을 줌 |
-| 아직 없음 (6단계에서 `server.py`에 추가) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
-| 아직 없음 (6단계에서 `server.py`에 추가) | 값으로 `None`(JSON의 `null`)은 저장할 수 없음. 검증은 6단계 | `get`이 돌려주는 `None`이 항상 "없음"을 뜻하게 하기 위함 (DESIGN.md 제안과 같음) |
+| `server.py` `check_key` (6단계) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
+| `server.py` `check_set_body` (6단계) | 값으로 `None`(JSON의 `null`)은 저장할 수 없음. 검증은 6단계 | `get`이 돌려주는 `None`이 항상 "없음"을 뜻하게 하기 위함 (DESIGN.md 제안과 같음) |
 
 [DECISIONS.md](./DECISIONS.md)에도 같은 내용이 모여 있습니다.
 

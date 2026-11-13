@@ -21,8 +21,8 @@
 | 1 | `server.py` `delete_value` · `store.py` `Store.delete` | 없는 키를 삭제하면 `delete`는 `False`, API는 200 `{"deleted": false}` | 삭제의 목적은 "값이 없는 상태"이므로 이미 없어도 실패가 아님. 실제로 지웠는지는 본문으로 알림 (DESIGN.md 제안과 같음) |
 | 1 | `store.py` `Store.set` | 이미 있는 키에 `set`을 하면 값을 덮어씀 | 캐시 값을 갱신하는 기본 동작 (DESIGN.md 제안과 같음) |
 | 1 | `store.py` `Store.set` | `set`의 `ttl` 인자는 4단계에서 추가 | 1단계에서 받기만 하고 무시하면 동작하는 것처럼 보여 혼란을 줌 |
-| 1 | 아직 없음 (6단계에서 `server.py`에 추가) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
-| 1 | 아직 없음 (6단계에서 `server.py`에 추가) | 값으로 `None`(JSON의 `null`)은 저장할 수 없음. 검증은 6단계 | `get`이 돌려주는 `None`이 항상 "없음"을 뜻하게 하기 위함 (DESIGN.md 제안과 같음) |
+| 1 | `server.py` `check_key` (6단계) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
+| 1 | `server.py` `check_set_body` (6단계) | 값으로 `None`(JSON의 `null`)은 저장할 수 없음. 검증은 6단계 | `get`이 돌려주는 `None`이 항상 "없음"을 뜻하게 하기 위함 (DESIGN.md 제안과 같음) |
 | 2 | `store.py` `Store.__init__` · `hash_table.py` 전체 | 해시 테이블은 `hash_table.py`의 `HashTable`로 분리하고, `Store`는 그것을 감쌈 | 해시 테이블은 순수한 자료구조로 두고, 4단계의 만료와 5단계의 lock은 `Store`에서 처리 |
 | 2 | `hash_table.py` `__init__` (`capacity=8`) | 처음 칸 수는 8 | 충돌이 자주 일어나 체이닝을 눈으로 확인하기 쉬움 |
 | 2 | `hash_table.py` `__init__` (`_buckets`) · `set`, `get`, `delete` | 충돌 처리는 체이닝 | 구현과 설명이 단순하고 널리 쓰이는 방식. 실제 레디스도 체이닝을 씀 (DESIGN.md 제안과 같음) |
@@ -50,7 +50,7 @@
 | 4 | `store.py` `Store.get` · `Store.delete` | 만료된 키는 없는 키와 똑같이 취급 (`get`은 `None`, `delete`는 `False`, API는 404). `delete`는 남아 있던 항목을 지우고 `False` | 사용하는 쪽에서는 이미 없는 키. `get`을 먼저 불렀는지에 따라 결과가 달라지지 않음 (DESIGN.md 제안과 같음) |
 | 4 | `store.py` `_is_expired` | `지금 >= 만료 시점`이면 만료 | `ttl=5`는 "5초 동안 보관"이므로 정확히 5초가 되는 순간 기간이 끝남 |
 | 4 | `tests/test_store.py` | 4단계 테스트는 `test_store.py`에 추가 | 만료는 `HashTable`이 아니라 `Store`의 일 |
-| 4 | 아직 없음 (6단계에서 `server.py`에 추가) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
+| 4 | `server.py` `check_ttl` (6단계) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
 | 5 | `server.py` 맨 아래 (`app.run`) | 서버는 요청마다 스레드를 쓰는 Flask 기본 방식을 유지. 스레드 하나로 바꾸지 않음 | 느린 요청이 다른 요청을 막지 않음. 저장소의 안전은 서버 구조가 아니라 `Store`의 lock이 보장 |
 | 5 | `store.py` `Store.__init__` (`_lock`) | lock은 `Store` 안에서 처리하고, 서버는 lock을 모름 | 저장소를 사용하는 쪽에서 lock을 빠뜨릴 수 없게 함. 만료 확인처럼 여러 단계로 된 동작을 아는 쪽이 `Store` (DESIGN.md 제안과 같음) |
 | 5 | `store.py` `Store.__init__` (`_lock`) | 저장소 전체에 lock 하나. 칸마다 lock을 두지 않음 | resize 때 모든 칸을 잠가야 하고, 칸 수가 바뀌면 lock도 다시 만들어야 함. GIL 때문에 얻는 것도 적음. 명령을 하나씩 실행하는 레디스와 같은 보장 (DESIGN.md 제안과 같음) |
@@ -59,3 +59,16 @@
 | 5 | `hash_table.py` | `HashTable`에는 lock을 걸지 않음 | 순수한 자료구조로 둠(2단계 결정). `Store`의 lock 안에서만 불려 안쪽 lock은 아무도 막지 않음 |
 | 5 | `tests/test_store.py` | 동시성 테스트는 `test_store.py`에 추가하고, 테스트 동안 `sys.setswitchinterval(1e-6)`으로 스레드를 자주 교대시킴 | 기본 설정에서는 lock 없이도 20번 모두 통과해 lock의 효과를 확인할 수 없음. 자주 교대하면 lock 없이 20번 모두 깨짐 |
 | 5 | `tests/test_store.py` (완료 테스트 순서) | lock 없는 코드로 동시성 테스트가 깨지는 것을 먼저 본 뒤 lock을 추가 | "lock 덕분에 통과했다"고 말할 수 있음 |
+| 6 | `server.py` `check_set_body`, `check_key`, `check_ttl` | 입력 검증은 `server.py`의 검증 함수에서 함. 잘못되면 오류 설명, 괜찮으면 `None`을 돌려주고, 경로 함수가 400으로 응답. 저장소에는 올바른 입력만 전달 | 검증을 한 곳에 모아 저장소를 단순하게 유지. 요청의 모양은 HTTP를 받는 쪽만 앎 (DESIGN.md 제안과 같음) |
+| 6 | `server.py` 경로 함수의 실패 응답 | 클라이언트의 잘못된 입력에는 500이 아니라 400 | 4xx는 "보낸 쪽이 고쳐야 함"을 알림. 500이면 보낸 쪽이 서버 고장으로 오해함 |
+| 6 | `server.py` `check_set_body` | 잘못된 곳이 여러 개면 처음 발견한 하나만 `{"error": "설명"}`으로 알림 | 1단계의 실패 응답 형식 그대로. 하나씩 고치면 됨 |
+| 6 | `server.py` `check_set_body` (`SET_FIELDS`) | `/set` 본문에 `key`, `value`, `ttl` 말고 다른 항목이 있으면 400 | 오타 `"tll"`이 무시되면, 곧 사라질 줄 안 키가 영원히 남음 |
+| 6 | `server.py` `check_set_body` | `/set` 본문이 JSON 객체가 아니면 "요청 본문은 JSON 객체여야 합니다" | 1단계에서는 "key와 value가 필요합니다"로 함께 처리했지만, 원인을 정확히 알려 줌 |
+| 6 | `server.py` `check_key` | 키는 비어 있지 않은 문자열. 공백뿐인 키(`" "`)는 허용 | 1단계에서 정한 규칙. 실제 레디스도 키 내용을 따지지 않음 (DESIGN.md 제안과 같음) |
+| 6 | `server.py` `get_value`, `delete_value` (`check_key`) | 쿼리의 키가 비어 있으면(`?key=`) 400 | `/set`과 같은 규칙. 404("없음")가 아니라 "애초에 만들 수 없는 키"라고 알려 줌 |
+| 6 | `server.py` `check_set_body` | 값은 `null`만 막고 나머지 JSON 값은 모두 허용. 리스트 안의 `null`도 허용 | `get`이 돌려주는 `None`이 언제나 "없음"이면 됨. 리스트는 `None`이 아님 (DESIGN.md 제안과 같음) |
+| 6 | `server.py` `check_ttl` | `ttl`은 숫자(`int`, `float`)이고 `bool`은 막음 | 파이썬의 `bool`은 `int`의 한 종류라, 막지 않으면 `true`가 1초로 저장됨 |
+| 6 | `server.py` `check_ttl` | `ttl`은 소수도 허용 (`1.5`초) | 시계가 소수 단위라 그대로 동작함 |
+| 6 | `server.py` `check_ttl` (`MAX_TTL`) | `ttl`의 범위는 `0 < ttl <= 10년`(315,360,000초). 이 비교 하나로 0 이하, `NaN`, `Infinity`, 아주 큰 정수를 모두 막음 | `math.isfinite()`는 아주 큰 정수에서 `OverflowError`를 내 500이 됨. `NaN`은 비교가 모두 거짓이라 범위 밖으로 걸림. 10년 넘는 보관은 `ttl`을 생략하면 됨 (DESIGN.md의 "0보다 큰 숫자" 제안에 최댓값을 더함) |
+| 6 | `server.py` `check_ttl` | `"ttl": null`은 생략과 같이 만료 없음 | JSON의 `null`은 "없음"이라는 뜻 |
+| 6 | `tests/test_server.py` | 검증 테스트는 `tests/test_server.py`를 새로 만들어 Flask 테스트 클라이언트로 확인. 테스트마다 `server.store`를 빈 `Store()`로 바꿔 끼움 | 서버를 띄우지 않고 API를 확인할 수 있음. 테스트끼리 영향을 주지 않음. 다른 API 기능 테스트는 10단계 |

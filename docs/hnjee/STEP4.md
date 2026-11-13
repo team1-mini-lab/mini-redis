@@ -130,7 +130,7 @@ set("name", "현지", ttl=5)    # 5초 뒤 만료
 | `store.py` `Store.get` · `Store.delete` | 만료된 키는 없는 키와 똑같이 취급 (`get`은 `None`, `delete`는 `False`, API는 404). `delete`는 남아 있던 항목을 지우고 `False` | 사용하는 쪽에서는 이미 없는 키. `get`을 먼저 불렀는지에 따라 결과가 달라지지 않음 (DESIGN.md 제안과 같음) |
 | `store.py` `_is_expired` | `지금 >= 만료 시점`이면 만료 | `ttl=5`는 "5초 동안 보관"이므로 정확히 5초가 되는 순간 기간이 끝남 |
 | `tests/test_store.py` | 4단계 테스트는 `test_store.py`에 추가 | 만료는 `HashTable`이 아니라 `Store`의 일 |
-| 아직 없음 (6단계에서 `server.py`에 추가) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
+| `server.py` `check_ttl` (6단계) | `ttl`의 단위는 초이고 0보다 큰 숫자. 검증은 6단계 | 단위를 하나로 통일. 0 이하는 저장 즉시 만료되어 의미가 없음 (DESIGN.md 제안과 같음) |
 
 [DECISIONS.md](./DECISIONS.md)에도 같은 내용이 모여 있습니다.
 
