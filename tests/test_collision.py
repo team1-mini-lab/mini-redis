@@ -6,8 +6,18 @@ import pytest
 from mini_redis.store import Store
 
 
+def _chain(bucket):
+    """칸의 첫 노드부터 체인을 따라가며 (키, 값) 목록을 만든다."""
+    items = []
+    current = bucket
+    while current is not None:
+        items.append((current.key, current.value))
+        current = current.next
+    return items
+
+
 def _all_items(store):
-    return [item for bucket in store._buckets for item in bucket]
+    return [item for bucket in store.buckets for item in _chain(bucket)]
 
 
 def _check_chains(store, expected):
@@ -16,9 +26,9 @@ def _check_chains(store, expected):
     keys = [item[0] for item in items]
     assert len(keys) == len(set(keys)), "같은 키가 체인에 두 번 들어 있음"
     assert {item[0]: item[1] for item in items} == expected
-    for i, bucket in enumerate(store._buckets):
-        for item in bucket:
-            assert store._index(item[0]) == i, "키가 엉뚱한 칸에 들어 있음"
+    for i, bucket in enumerate(store.buckets):
+        for item in _chain(bucket):
+            assert store._get_bucket_index(item[0]) == i, "키가 엉뚱한 칸에 들어 있음"
 
 
 def _keys_in_same_bucket(store, n):
@@ -27,9 +37,9 @@ def _keys_in_same_bucket(store, n):
     i = 0
     while True:
         key = f"key{i}"
-        groups.setdefault(store._index(key), []).append(key)
-        if len(groups[store._index(key)]) == n:
-            return groups[store._index(key)]
+        groups.setdefault(store._get_bucket_index(key), []).append(key)
+        if len(groups[store._get_bucket_index(key)]) == n:
+            return groups[store._get_bucket_index(key)]
         i += 1
 
 
@@ -40,8 +50,8 @@ def test_real_collision_with_normal_capacity():
     for n, key in enumerate(keys):
         store.set(key, n)
 
-    bucket = store._buckets[store._index(keys[0])]
-    assert len(bucket) == 5
+    bucket = store.buckets[store._get_bucket_index(keys[0])]
+    assert len(_chain(bucket)) == 5
     for n, key in enumerate(keys):
         assert store.get(key) == n
 
@@ -54,7 +64,7 @@ def test_more_keys_than_buckets(capacity):
     for key, value in expected.items():
         store.set(key, value)
 
-    assert max(len(b) for b in store._buckets) >= 50 // capacity
+    assert max(len(_chain(b)) for b in store.buckets) >= 50 // capacity
     _check_chains(store, expected)
     for key, value in expected.items():
         assert store.get(key) == value

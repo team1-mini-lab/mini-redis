@@ -1,6 +1,16 @@
 from mini_redis.store import Store
 
 
+def _chain(bucket):
+    """칸의 첫 노드부터 체인을 따라가며 (키, 값) 목록을 만든다."""
+    items = []
+    current = bucket
+    while current is not None:
+        items.append((current.key, current.value))
+        current = current.next
+    return items
+
+
 def test_all_keys_in_one_bucket():
     store = Store(capacity=1)          # 칸 1개 → 모든 키가 같은 칸에 들어감
 
@@ -9,8 +19,8 @@ def test_all_keys_in_one_bucket():
     store.set("c", 3)
 
     # 정말 한 칸에 몰렸는지 확인
-    assert len(store._buckets) == 1
-    assert len(store._buckets[0]) == 3
+    assert len(store.buckets) == 1
+    assert len(_chain(store.buckets[0])) == 3
 
     # 조회: 같은 칸에서도 키로 정확히 찾는지
     assert store.get("a") == 1
@@ -26,7 +36,7 @@ def test_overwrite_in_chain():
     store.set("a", 100)                # 같은 키 → 추가가 아니라 덮어쓰기
 
     assert store.get("a") == 100
-    assert len(store._buckets[0]) == 2  # 항목 수는 그대로 2개
+    assert len(_chain(store.buckets[0])) == 2  # 항목 수는 그대로 2개
 
 
 def test_delete_middle_of_chain():
