@@ -58,6 +58,34 @@ class ExpiryTest(unittest.TestCase):
         res = self.client.get("/get?key=popular")
         self.assertEqual((res.status_code, res.get_json()), (200, {"key": "popular", "value": "새목록"}))
 
+    def test_criterion_ttl5_then_404_and_no_ttl_stays(self):
+        """3차 체크인 완료 기준: TTL을 주면 바로 조회되고 5초 뒤에는 404. TTL 없으면 계속 조회된다."""
+        self.client.post("/set", json={"key": "a", "value": 1, "ttl": 5})
+        self.client.post("/set", json={"key": "b", "value": 2})
+        self.assertEqual(self.client.get("/get?key=a").status_code, 200)
+        self.now = 1005
+        self.assertEqual(self.client.get("/get?key=a").status_code, 404)
+        self.now = 999_999
+        self.assertEqual(self.client.get("/get?key=b").get_json(), {"key": "b", "value": 2})
+
+    def test_expire_time_survives_resize(self):
+        """확장(_resize)이 일어나도 만료 시점이 노드와 함께 따라간다."""
+        self.set_popular(ttl=10)
+        capacity_before = server.store._table.capacity
+        for i in range(20):                                  # 키 20개를 더 넣어 8칸 → 32칸으로 확장시킨다
+            self.client.post("/set", json={"key": f"k{i}", "value": i})
+        self.assertGreater(server.store._table.capacity, capacity_before)
+        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+        self.now = 1010
+        self.assertEqual(self.client.get("/get?key=popular").status_code, 404)
+
+    def test_put_tuple_again_keeps_expire_time(self):
+        """해시 테이블 put에 (값, 만료 시점) 튜플을 다시 넣어도 만료 시점은 사라지지 않는다 (튜플은 값 하나)."""
+        self.set_popular(ttl=10)
+        entry = server.store._table.get("popular")          # ("상품목록", 1010)
+        server.store._table.put("popular", entry)            # 같은 튜플로 다시 put
+        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+
 
 if __name__ == "__main__":
     unittest.main()
