@@ -1,5 +1,4 @@
-from mini_redis.store import Store
-
+from mini_redis.store import HashTable
 
 def _chain(bucket):
     """칸의 첫 노드부터 체인을 따라가며 (키, 값) 목록을 만든다."""
@@ -26,7 +25,7 @@ def _keys_in_same_bucket(store, n):
 
 def test_chaining_in_one_bucket():
     # 3단계부터 칸이 0.75 넘게 차면 늘어나므로, 칸 8개에 3개만 넣어 확장 없이 충돌을 만든다
-    store = Store(capacity=8)
+    store = HashTable(capacity=8)
     a, b, c = _keys_in_same_bucket(store, 3)
     store.set(a, 1)
     store.set(b, 2)
@@ -45,7 +44,7 @@ def test_chaining_in_one_bucket():
 
 
 def test_resize_keeps_all_keys():
-    store = Store()                    # 칸 4개로 시작
+    store = HashTable()                    # 칸 4개로 시작
     for i in range(100):
         store.set(f"k{i}", i)
 
