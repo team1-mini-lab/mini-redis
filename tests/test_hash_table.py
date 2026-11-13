@@ -51,3 +51,20 @@ def test_resize_keeps_all_keys():
     assert store.capacity > 4          # 칸 수가 늘어남
     assert store.size == 100
     assert all(store.get(f"k{i}") == i for i in range(100))   # 100개 모두 조회
+
+import time
+
+def test_expire():
+    table = HashTable()
+    table.set("code", "1234", ttl=1)
+    assert table.get("code") == "1234"   # 바로는 조회됨
+    time.sleep(1.1)
+    assert table.get("code") is None     # 1초 뒤엔 없음
+    assert table.size == 0               # 지연 삭제로 실제로 지워짐
+
+def test_overwrite_resets_ttl():
+    table = HashTable()
+    table.set("a", 1, ttl=1)
+    table.set("a", 2)                    # ttl 없이 덮어씀 → 만료 없어짐
+    time.sleep(1.1)
+    assert table.get("a") == 2

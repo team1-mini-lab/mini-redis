@@ -1,9 +1,15 @@
+import time
+
 class Node:
-	def __init__(self, key, value, next = None):
-		self.key = key
-		self.value = value
-		self.next = next
-          
+    def __init__(self, key, value, expire_at=None, next=None):
+        self.key = key
+        self.value = value
+        self.expire_at = expire_at
+        self.next = next
+
+    def is_expired(self):
+        return self.expire_at is not None and time.time() >= self.expire_at
+    
 class HashTable:
     """해시 테이블 저장소.
 바깥은 버킷 리스트, 안쪽 체인은 연결 리스트(Node)로 한다.
@@ -14,15 +20,17 @@ class HashTable:
         self.size = 0  
 
     def set(self, key, value, ttl=None):
+        expire_at = time.time() + ttl if ttl is not None else None
         index = self._get_bucket_index(key)
         head = self.buckets[index]
         node = head
         while node is not None:
-            if node.key == key:
-                node.value = value
-                return                   
-            node = node.next
-        self.buckets[index] = Node(key, value, head)
+          if node.key == key:
+            node.value = value
+            node.expire_at = expire_at
+            return                   
+          node = node.next
+        self.buckets[index] = Node(key, value, expire_at, self.buckets[index])
         self.size += 1
         if self.size / self.capacity > 0.75:                
             self._resize()
@@ -50,6 +58,9 @@ class HashTable:
         current = self.buckets[index]
         while current is not None:
             if current.key == key:
+                if current.is_expired():
+                  self.delete(key)
+                  return None
                 return current.value
             current = current.next
         return None
@@ -66,7 +77,7 @@ class HashTable:
                 else:                         
                     prev.next = current.next
                 self.size -= 1
-                return True
+                return not current.is_expired()
             prev = current
             current = current.next
         return False
