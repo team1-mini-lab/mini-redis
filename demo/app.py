@@ -14,12 +14,20 @@
 실행
     터미널 1:  python -m mini_redis.server      (mini-redis, 8000)
     터미널 2:  python -m demo.app               (데모 API, 8001)
+
+서버 여러 대로 띄우기 (3차 체크인의 "서버가 여러 대가 되면?")
+    python -m demo.app --port 8001
+    python -m demo.app --port 8002              두 대가 같은 mini-redis, 같은 DB를 본다
+    python -m demo.app --port 8003 --cache local   비교용: 캐시를 서버 안 dict에 둔다
 """
+import argparse
+import os
 import time
 
 from flask import Flask, jsonify, request
 
-from demo import cache, db
+from demo import db
+from demo.cache import make_cache
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
@@ -27,6 +35,15 @@ app.json.ensure_ascii = False
 POPULAR_KEY = "popular_products"   # 접점 합의: 캐시 키 이름
 POPULAR_TTL = 60                   # 접점 합의: TTL 60초
 POPULAR_LIMIT = 3
+
+# 실행할 때 main()에서 정한다. import만 했을 때(테스트 등)는 기본값을 쓴다.
+PORT = int(os.environ.get("DEMO_PORT", "8001"))
+cache = make_cache(os.environ.get("DEMO_CACHE", "redis"))
+
+
+def _server_name():
+    """응답에 넣을 서버 이름. 여러 대를 띄웠을 때 어느 서버가 답했는지 보여 준다."""
+    return f"{PORT} ({cache.name})"
 
 
 def _wants_cache():
@@ -39,10 +56,12 @@ def _wants_cache():
 
 @app.get("/")
 def health():
-    """데모 API와 mini-redis가 모두 떠 있는지 알려 준다."""
+    """데모 API와 캐시가 모두 떠 있는지 알려 준다."""
     return jsonify({
         "message": "demo api is running",
-        "mini_redis": "up" if cache.ping() else "down",
+        "server": _server_name(),
+        "cache": cache.name,
+        "cache_status": "up" if cache.ping() else "down",
     })
 
 
@@ -60,6 +79,7 @@ def popular_products():
         cached = cache.get(POPULAR_KEY)
         if cached is not None:                      # 캐시 히트
             return jsonify({
+                "server": _server_name(),
                 "source": "cache",
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
                 "products": cached,
@@ -72,6 +92,7 @@ def popular_products():
         cache.set(POPULAR_KEY, products, ttl=POPULAR_TTL)
 
     return jsonify({
+        "server": _server_name(),
         "source": "db" if use_cache else "db (nocache)",
         "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
         "products": products,
@@ -83,8 +104,8 @@ def update_price(product_id):
     """가격 수정: DB를 고치고 캐시를 지운다 (무효화).
 
     3차 체크인의 장면 ①이 여기서 해결된다. 로컬 캐시였다면 요청을 받은 서버만
-    자기 캐시를 고칠 수 있어서 다른 서버에는 옛 가격이 남았다. 공용 저장소라면
-    키 하나를 지우는 것으로 캐시를 보는 모든 서버가 새 값을 보게 된다.
+    자기 캐시를 지울 수 있어서 다른 서버에는 옛 가격이 남는다 (--cache local로 확인).
+    공용 저장소라면 키 하나를 지우는 것으로 캐시를 보는 모든 서버가 새 값을 본다.
     """
     body = request.get_json(silent=True)
     if not isinstance(body, dict) or "price" not in body:
@@ -100,6 +121,7 @@ def update_price(product_id):
     invalidated = cache.delete(POPULAR_KEY)         # ② 그 다음 캐시를 지운다
 
     return jsonify({
+        "server": _server_name(),
         "ok": True,
         "product": db.get_product(product_id),
         "cache_invalidated": invalidated,
@@ -117,15 +139,15 @@ def get_product(product_id):
 
 @app.get("/stats")
 def stats():
-    """DB를 몇 번 조회했는지. 캐시가 DB를 얼마나 막아 줬는지 보여 준다."""
-    return jsonify({"db_query_count": db.query_count})
+    """DB를 몇 번 조회했는지 (모든 서버 합계). 캐시가 DB를 얼마나 막아 줬는지 보여 준다."""
+    return jsonify({"db_query_count": db.query_count()})
 
 
 @app.post("/stats/reset")
 def reset_stats():
     """측정을 시작할 때 DB 조회 횟수를 0으로 돌린다 (9단계용)."""
     db.reset_query_count()
-    return jsonify({"ok": True, "db_query_count": db.query_count})
+    return jsonify({"ok": True, "db_query_count": db.query_count()})
 
 
 @app.delete("/cache")
@@ -144,9 +166,27 @@ def method_not_allowed(error):
     return jsonify({"error": "허용하지 않는 메서드입니다"}), 405
 
 
-if __name__ == "__main__":
-    if not cache.ping():
+def main():
+    global PORT, cache
+    parser = argparse.ArgumentParser(description="mini-redis 데모 API")
+    parser.add_argument("--port", type=int, default=PORT, help="포트 (기본 8001)")
+    parser.add_argument(
+        "--cache", choices=["redis", "local"], default=cache.name,
+        help="redis: mini-redis를 HTTP로 사용 (기본) / local: 서버 안 dict (비교용)",
+    )
+    args = parser.parse_args()
+
+    PORT = args.port
+    cache = make_cache(args.cache)
+    db.init()
+
+    if args.cache == "redis" and not cache.ping():
         print("[경고] mini-redis(8000)가 떠 있지 않습니다. 먼저 실행하세요:")
         print("        python -m mini_redis.server")
+    print(f"데모 API {_server_name()} 시작")
     # threaded=True: 동시 요청을 받아야 캐시 효과를 제대로 보여 줄 수 있다
-    app.run(host="127.0.0.1", port=8001, threaded=True)
+    app.run(host="127.0.0.1", port=PORT, threaded=True)
+
+
+if __name__ == "__main__":
+    main()

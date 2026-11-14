@@ -4,49 +4,84 @@
 실제 DB에서 인기 상품을 뽑는 일(판매량 집계, 정렬)은 무거운 조회라서,
 여기서는 time.sleep으로 그 비용을 흉내 낸다.
 
+원본은 SQLite 파일에 둔다. 데모 API를 여러 대 띄워도 모두 같은 원본을 봐야
+"서버가 여러 대일 때"를 제대로 재현할 수 있기 때문이다. 실제 서비스에서도
+앱 서버는 여러 대여도 DB는 함께 쓴다. (파이썬 dict로 두면 서버마다 DB가 따로 생긴다)
+
 이 모듈은 캐시를 전혀 모른다. 캐시를 쓸지 말지는 app.py가 정한다 (Cache-Aside).
 """
-import threading
+import os
+import sqlite3
 import time
+from contextlib import closing
 
-# 원본 데이터. 3차 체크인에서 발표한 "다섯 장면"의 키보드 가격 예시를 그대로 쓴다.
-_PRODUCTS = {
-    1: {"id": 1, "name": "키보드", "price": 50000, "sales": 320},
-    2: {"id": 2, "name": "마우스", "price": 20000, "sales": 280},
-    3: {"id": 3, "name": "모니터", "price": 250000, "sales": 150},
-    4: {"id": 4, "name": "헤드셋", "price": 80000, "sales": 95},
-    5: {"id": 5, "name": "웹캠", "price": 45000, "sales": 40},
-}
+# 원본 파일 위치. 여러 프로세스가 같은 파일을 열어 원본을 공유한다.
+DB_PATH = os.environ.get(
+    "DEMO_DB_PATH", os.path.join(os.path.dirname(__file__), "demo.sqlite3")
+)
 
 # 무거운 조회를 흉내 내는 지연(초). 과제 예시가 3초라 기본값을 3으로 둔다.
-QUERY_DELAY = 3.0
+QUERY_DELAY = float(os.environ.get("DEMO_DB_DELAY", "3"))
 
-# 여러 요청이 동시에 _PRODUCTS를 만질 수 있으니 DB 쪽도 lock으로 보호한다.
-# (실제 DB라면 DBMS가 해 주는 일이다)
-_lock = threading.Lock()
+# 처음 상태. 3차 체크인에서 발표한 "다섯 장면"의 키보드 가격 예시를 그대로 쓴다.
+SEED_PRODUCTS = [
+    (1, "키보드", 50000, 320),
+    (2, "마우스", 20000, 280),
+    (3, "모니터", 250000, 150),
+    (4, "헤드셋", 80000, 95),
+    (5, "웹캠", 45000, 40),
+]
 
-# 이 과정에서 DB를 몇 번 조회했는지 센다. 9단계 성능 비교에서 "캐시가 DB를 얼마나
-# 막아 줬는지"를 숫자로 보여 주는 데 쓴다.
-query_count = 0
+
+def _connect():
+    # timeout: 다른 프로세스가 쓰는 중이면 최대 5초 기다린다
+    conn = sqlite3.connect(DB_PATH, timeout=5)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def _sleep_like_a_slow_query():
-    """무거운 조회를 흉내 낸다."""
-    time.sleep(QUERY_DELAY)
+def init():
+    """테이블이 없으면 만들고 처음 상태로 채운다. 이미 있으면 건드리지 않는다.
+
+    두 번째 서버가 켜질 때 첫 번째 서버가 고친 가격을 덮어쓰면 안 되므로,
+    비어 있을 때만 채운다.
+    """
+    with closing(_connect()) as conn, conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS products "
+            "(id INTEGER PRIMARY KEY, name TEXT, price INTEGER, sales INTEGER)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS stats (name TEXT PRIMARY KEY, value INTEGER)"
+        )
+        if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
+            conn.executemany("INSERT INTO products VALUES (?, ?, ?, ?)", SEED_PRODUCTS)
+        conn.execute("INSERT OR IGNORE INTO stats VALUES ('query_count', 0)")
+
+
+def reset():
+    """가격과 조회 횟수를 처음 상태로 돌린다. 시연을 처음부터 다시 할 때 쓴다."""
+    init()
+    with closing(_connect()) as conn, conn:
+        conn.execute("DELETE FROM products")
+        conn.executemany("INSERT INTO products VALUES (?, ?, ?, ?)", SEED_PRODUCTS)
+        conn.execute("UPDATE stats SET value = 0 WHERE name = 'query_count'")
 
 
 def get_popular_products(limit=3):
     """인기 상품을 판매량 순으로 돌려준다. 느리다 (QUERY_DELAY초).
 
     실제라면 "주문 테이블을 상품별로 집계하고 정렬"하는 무거운 조회에 해당한다.
+    조회할 때마다 횟수를 센다. 캐시가 DB를 얼마나 막아 줬는지 보여 주는 숫자다.
     """
-    global query_count
-    _sleep_like_a_slow_query()
-    with _lock:
-        query_count += 1
-        ranked = sorted(_PRODUCTS.values(), key=lambda p: p["sales"], reverse=True)
-        # 사본을 돌려준다. 바깥에서 고쳐도 원본이 바뀌지 않게.
-        return [dict(p) for p in ranked[:limit]]
+    time.sleep(QUERY_DELAY)
+    with closing(_connect()) as conn, conn:
+        conn.execute("UPDATE stats SET value = value + 1 WHERE name = 'query_count'")
+        rows = conn.execute(
+            "SELECT id, name, price, sales FROM products ORDER BY sales DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def update_price(product_id, price):
@@ -55,23 +90,31 @@ def update_price(product_id, price):
     쓰기는 원본만 고친다. 캐시를 지우는 일(무효화)은 app.py의 책임이다.
     레디스는 원본이 바뀐 것을 알 방법이 없기 때문이다.
     """
-    with _lock:
-        product = _PRODUCTS.get(product_id)
-        if product is None:
-            return False
-        product["price"] = price
-        return True
+    with closing(_connect()) as conn, conn:
+        cursor = conn.execute(
+            "UPDATE products SET price = ? WHERE id = ?", (price, product_id)
+        )
+        return cursor.rowcount == 1
 
 
 def get_product(product_id):
     """상품 하나를 돌려준다. 지연 없음 (가격 확인용)."""
-    with _lock:
-        product = _PRODUCTS.get(product_id)
-        return dict(product) if product else None
+    with closing(_connect()) as conn:
+        row = conn.execute(
+            "SELECT id, name, price, sales FROM products WHERE id = ?", (product_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def query_count():
+    """지금까지 인기 상품 조회(느린 조회)를 몇 번 했는지. 모든 서버를 합친 숫자다."""
+    with closing(_connect()) as conn:
+        return conn.execute(
+            "SELECT value FROM stats WHERE name = 'query_count'"
+        ).fetchone()[0]
 
 
 def reset_query_count():
     """9단계 측정을 시작할 때 조회 횟수를 0으로 돌린다."""
-    global query_count
-    with _lock:
-        query_count = 0
+    with closing(_connect()) as conn, conn:
+        conn.execute("UPDATE stats SET value = 0 WHERE name = 'query_count'")
