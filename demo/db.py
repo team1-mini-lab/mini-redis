@@ -34,7 +34,9 @@ SEED_PRODUCTS = [
 
 
 def _connect():
-    # timeout: 다른 프로세스가 쓰는 중이면 최대 5초 기다린다
+    # timeout: 다른 프로세스(다른 데모 서버)가 쓰는 중이면 최대 5초 기다린다.
+    # SQLite는 쓰는 동안 파일을 잠근다. 우리 쓰기는 몇 ms라 5초면 충분하고,
+    # 무언가 꼬였을 때 영원히 멈추지 않고 오류를 낸다. 5초는 sqlite3의 기본값이다.
     conn = sqlite3.connect(DB_PATH, timeout=5)
     conn.row_factory = sqlite3.Row
     return conn

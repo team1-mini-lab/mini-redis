@@ -242,7 +242,9 @@ def main():
         print("[경고] mini-redis(8000)가 떠 있지 않습니다. 먼저 실행하세요:")
         print("        python -m mini_redis.server")
     print(f"데모 API {_server_name()} 시작")
-    # threaded=True: 동시 요청을 받아야 캐시 효과를 제대로 보여 줄 수 있다
+    # threaded=True: 요청마다 스레드를 따로 써서 동시에 처리한다. 한 요청이 DB에서
+    # 3초 기다리는 동안 다른 요청(캐시 히트 등)이 줄 서서 기다리지 않게 한다.
+    # Flask 1.0부터 기본값이 True라 없어도 같지만, 의도를 보이려고 적어 둔다.
     app.run(host="127.0.0.1", port=PORT, threaded=True)
 
 
