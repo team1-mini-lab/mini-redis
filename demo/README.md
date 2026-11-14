@@ -34,6 +34,8 @@ python -m demo.scenario --delay 1  # DB 지연을 1초로 줄여서 빠르게
 | ③ | 서버 A에서 키보드 40,000원으로 할인 | A의 캐시만 지움 | mini-redis 키를 지움 |
 | ④ | A, B로 조회 | **B는 50,000원** (장면 ① 가격이 왔다 갔다) | A, B 모두 40,000원 |
 | ⑤ | 서버 A 재시작 후 조회 | **DB** (장면 ③ 배포하면 DB가 몰림) | 캐시 (서버 밖이라 그대로) |
+| ⑥ | 서버 A로 로그인 | A의 캐시에만 세션 저장 | mini-redis에 세션 저장 |
+| ⑦ | 서버 B로 `/me` | **401 로그인이 필요합니다** (장면 ② 로그인이 풀림) | 알아봄 (어느 서버든 유지) |
 | | 전체 DB 조회 | 4번 | 2번 |
 
 직접 띄워서 확인하려면:
@@ -55,6 +57,9 @@ python -m demo.app --port 8102 --cache local
 | GET | `/products/popular?nocache=1` | 캐시를 건너뛰고 DB로 (9단계 비교용) |
 | PUT | `/products/<id>/price` | 가격 수정 → DB 수정 후 캐시 삭제 (무효화) |
 | GET | `/products/<id>` | 상품 하나 (가격 확인용, 캐시 안 씀) |
+| POST | `/login` | 로그인 → 세션을 캐시에 저장하고 토큰 반환 (본문 `{"user":"..."}`) |
+| GET | `/me?token=` | 세션 조회. 없거나 만료되면 401 (장면 ② 시연용) |
+| POST | `/logout?token=` | 세션 키 삭제 |
 | GET | `/stats` | DB 조회 횟수 |
 | POST | `/stats/reset` | DB 조회 횟수 초기화 |
 | DELETE | `/cache` | 캐시 비우기 |
@@ -73,6 +78,25 @@ curl localhost:8001/products/popular        # source=db,    약 3000ms, 키보�
 curl localhost:8001/products/popular        # source=cache, 약 2ms,    키보드 40000원
 ```
 
+## 시연 순서 (장면 ② 로그인이 풀림을 공용 저장소로 해결)
+
+세션도 결국 키-값이라 인기 상품과 똑같은 `set` / `get`을 씁니다. 따로 만든 기능이 없습니다.
+
+```bash
+# 서버 두 대를 띄워 두고 (한 대는 로그인, 다른 한 대로 조회)
+python -m demo.app --port 8001
+python -m demo.app --port 8002
+
+TOKEN=$(curl -s -X POST localhost:8001/login \
+        -H "Content-Type: application/json" -d '{"user":"eungi"}' | python -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+
+curl "localhost:8002/me?token=$TOKEN"       # {"user":"eungi"}  — 다른 서버인데 알아봄
+curl -X POST "localhost:8001/logout?token=$TOKEN"
+curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 — 모든 서버에서 풀림
+```
+
+`--cache local`로 띄운 두 대에 같은 순서로 보내면 첫 `/me`부터 401이 나옵니다. 로그인을 받은 서버만 세션을 알기 때문입니다.
+
 ## 설계 결정
 
 | 결정 | 이유 |
@@ -85,6 +109,7 @@ curl localhost:8001/products/popular        # source=cache, 약 2ms,    키보�
 | 성능 비교는 `?nocache=1`로 | 같은 코드 경로에서 캐시만 빼서, 다른 조건은 똑같이 유지 |
 | 가짜 DB는 SQLite 파일 | 서버를 여러 대 띄워도 원본은 하나여야 함. `dict`로 두면 서버마다 DB가 따로 생겨 시연이 성립하지 않음. 실제 서비스도 앱 서버는 여러 대, DB는 공유 |
 | 로컬 캐시 모드(`--cache local`)를 일부러 둠 | 문제가 생기는 모습을 먼저 봐야 mini-redis로 풀리는 게 보임. 앱 코드는 그대로 두고 캐시만 바꿔 끼워 비교 |
+| 세션에 별도 기능을 만들지 않음 | 세션도 키-값이라 인기 상품과 같은 `set` / `get`으로 끝남. 로그인 유지 시간이 그대로 TTL이 됨 (`DEMO_SESSION_TTL`, 기본 30분) |
 | 첫 조회(미스)와 이후(히트)를 따로 측정 | 섞어서 평균을 내면 측정 횟수에 따라 숫자가 달라져 뜻이 없어짐 |
 
 ### TTL 60초는 어떻게 정했나
@@ -104,7 +129,25 @@ TTL은 무효화의 대체가 아니라 **안전망**입니다. 무효화가 제
 - **시연·테스트용 값은 코드 기본값을 바꾸지 않고 환경변수로 줍니다.** 기본값을 바꾸면 운영 설정이 시연 편의에 끌려갑니다. `demo/app.py`의 `POPULAR_TTL`은 `DEMO_CACHE_TTL`이 없으면 60초 그대로입니다.
 - 60초와 캐시 키 이름은 분담안(#34)의 "제안" 칸에 예시로 적힌 값입니다. 팀 확정이 필요합니다.
 
-> 만료는 **저장소**의 일, 무효화는 **애플리케이션**의 일. 둘을 섞으면 "TTL을 늘려서 해결"하는 쪽으로 가게 됩니다.
+> 만료(TTL)는 **저장소**가 시간이 되면 알아서 지우는 것이고, 무효화는 값이 바뀐 걸 아는 **앱**이 바로 지우는 것입니다. 둘을 헷갈리면 "가격이 틀리게 보인다"는 문제를 TTL 숫자를 줄여서 풀려고 하게 되는데, 그러면 틀린 시간이 짧아질 뿐 없어지지 않고 DB 조회만 늘어납니다. 가격이 바뀌는 순간 지우는 것(무효화)이 진짜 해결입니다.
+
+## 테스트
+
+```bash
+python -m pytest tests/test_demo.py -v     # 14개, 서버를 띄우지 않고 1초 안에 끝남
+```
+
+서버를 띄우지 않고 Flask `test_client`로 요청을 보냅니다. mini-redis 쪽도 실제 `mini_redis/server.py`를 `test_client`로 부르므로, 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 그대로 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다.
+
+| 묶음 | 확인하는 것 |
+|---|---|
+| 완료 기준 | 두 번째 조회는 캐시에서(DB 1회) · 가격 수정 후 새 가격 · `?nocache=1`은 캐시를 안 씀 |
+| 서버 두 대 | 로컬 캐시는 B가 옛 가격(50,000원)을 봄 · mini-redis는 B도 새 가격 · 세션도 같은 차이(401 / 알아봄) · 로그아웃은 모든 서버에서 |
+| 캐시가 죽으면 | 조회는 DB로 답함 · 가격 수정도 성공하고 `cache_invalidated: false` |
+| 만료 | TTL이 지나면 다시 DB · DB를 앱 밖에서 고쳐도(무효화 실패) TTL이 지나면 저절로 맞음 |
+| 잘못된 입력 | 가격이 음수·문자·소수·true면 400 · 없는 상품 404 · 로그인 본문 없으면 400 |
+
+캐시 삭제를 일부러 빼고 돌려 보면 "가격 수정 후 새 가격", "mini-redis는 B도 새 가격", "로그아웃" 세 테스트가 실패합니다. 무효화가 빠지면 테스트가 잡아냅니다.
 
 ## 측정 결과 (9단계)
 

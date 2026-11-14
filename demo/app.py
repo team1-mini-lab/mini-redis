@@ -33,9 +33,12 @@ from demo.cache import make_cache
 app = Flask(__name__)
 app.json.ensure_ascii = False
 
-POPULAR_KEY = "popular_products"   # 접점 합의: 캐시 키 이름
-# 접점 합의: TTL 60초. 시연 스크립트는 단계마다 멈춰 설명하는 사이 만료되지 않도록
-# DEMO_CACHE_TTL로 길게 바꿔 쓴다.
+POPULAR_KEY = "popular_products"   # 캐시 키 이름 (분담안 #34의 제안값, 팀 확정 필요)
+
+# 캐시 보관 시간(초). 기본 60초 (분담안 #34의 제안값, 팀 확정 필요).
+# 환경변수 DEMO_CACHE_TTL이 있으면 그 값을 쓰고, 없으면 60초.
+# demo/scenario.py는 발표 중 단계마다 멈춰 설명하는 사이 캐시가 만료돼 장면이
+# 깨지지 않도록, 서버를 띄울 때만 이 값을 600초로 준다. 평소 실행에는 영향 없음.
 POPULAR_TTL = float(os.environ.get("DEMO_CACHE_TTL", "60"))
 POPULAR_LIMIT = 3
 
