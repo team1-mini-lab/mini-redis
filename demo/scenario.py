@@ -106,8 +106,9 @@ class Demo:
         keyboard = next(p for p in data["products"] if p["id"] == KEYBOARD)
         price = keyboard["price"]
         mark = "   ← 옛 가격!" if price == OLD_PRICE and self.price_changed else ""
-        print(f"    서버 {label}({port})  {data['source']:<5}  {data['elapsed_ms']:>7.1f}ms"
-              f"   키보드 {price:,}원{mark}")
+        where = "캐시에서" if data["source"] == "cache" else "DB에서  "
+        print(f"    서버 {label}({port})가 응답 · {where} {data['elapsed_ms']:>7.1f}ms"
+              f" · 키보드 {price:,}원{mark}")
         return data["source"], price
 
     def set_price(self, port, label, price):
@@ -129,7 +130,7 @@ class Demo:
 
     def pause(self):
         if self.step:
-            input("    (Enter) ")
+            input("    (Enter를 누르면 진행) ")
 
     # ── 한 부 ─────────────────────────────────────────────
 
@@ -242,6 +243,8 @@ def main():
 
     demo = Demo(args.delay, args.step)
     print(f"원본(DB) 지연 {args.delay:g}초. 서버를 띄우는 중...")
+    print("한 줄 읽는 법:  서버 A(8101)가 응답 · DB에서 3008.1ms · 키보드 50,000원")
+    print("               어느 서버가 / 어디서 가져와 / 얼마나 걸려 / 무슨 가격을 보여 줬나")
     try:
         demo.start_redis()
         local = demo.run_part(PARTS[0])
