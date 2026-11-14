@@ -31,7 +31,7 @@ python -m demo.scenario --delay 1  # DB 지연을 1초로 줄여서 빠르게
 |---|---|---|---|
 | ① | 서버 A로 조회 | DB (캐시 비어 있음) | DB (캐시 비어 있음) |
 | ② | 서버 B로 조회 | **DB에 또 감** (장면 ④ 같은 데이터를 서버 수만큼 저장) | 캐시 (A가 채운 걸 B도 봄) |
-| ③ | 서버 A에서 키보드 40,000원으로 할인 | A의 캐시만 지움 | mini-redis 키를 지움 |
+| ③ | 서버 A에서 SW-AI 40,000원으로 할인 | A의 캐시만 지움 | mini-redis 키를 지움 |
 | ④ | A, B로 조회 | **B는 50,000원** (장면 ① 가격이 왔다 갔다) | A, B 모두 40,000원 |
 | ⑤ | 서버 A 재시작 후 조회 | **DB** (장면 ③ 배포하면 DB가 몰림) | 캐시 (서버 밖이라 그대로) |
 | ⑥ | 서버 A로 로그인 | A의 캐시에만 세션 저장 | mini-redis에 세션 저장 |
@@ -67,15 +67,15 @@ python -m demo.app --port 8102 --cache local
 ## 시연 순서 (장면 ① 가격이 왔다 갔다를 무효화로 해결)
 
 ```bash
-curl localhost:8001/products/popular        # source=db,    약 3000ms, 키보드 50000원
-curl localhost:8001/products/popular        # source=cache, 약 2ms,    키보드 50000원
+curl localhost:8001/products/popular        # source=db,    약 3000ms, SW-AI 50000원
+curl localhost:8001/products/popular        # source=cache, 약 2ms,    SW-AI 50000원
 
 curl -X PUT localhost:8001/products/1/price \
      -H "Content-Type: application/json" -d '{"price":40000}'
                                             # cache_invalidated=true
 
-curl localhost:8001/products/popular        # source=db,    약 3000ms, 키보드 40000원
-curl localhost:8001/products/popular        # source=cache, 약 2ms,    키보드 40000원
+curl localhost:8001/products/popular        # source=db,    약 3000ms, SW-AI 40000원
+curl localhost:8001/products/popular        # source=cache, 약 2ms,    SW-AI 40000원
 ```
 
 ## 시연 순서 (장면 ② 로그인이 풀림을 공용 저장소로 해결)

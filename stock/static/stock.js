@@ -260,20 +260,8 @@ const api = {
   clearCache: () => call("DELETE", "/cache"),
 };
 
-// 데모 API의 원본 데이터는 상품 이름(키보드 등)이라서, 화면에서만 상품 id에 종목 이름을 붙인다.
-const STOCK_NAME_BY_PRODUCT_ID = {
-  1: "SW-AI",
-  2: "게임 랩",
-  3: "게임 테크 랩",
-};
-
 function stockFromProduct(product) {
-  return {
-    id: product.id,
-    name: STOCK_NAME_BY_PRODUCT_ID[product.id] || product.name,
-    price: product.price,
-    volume: product.sales,
-  };
+  return { id: product.id, name: product.name, price: product.price, volume: product.sales };
 }
 
 async function call(method, path, body) {

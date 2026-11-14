@@ -67,7 +67,7 @@ def parse_arguments():
 
 def print_how_to_read(db_delay):
     print(f"원본(DB) 지연 {db_delay:g}초. 서버를 띄우는 중...")
-    print("한 줄 읽는 법:  서버 A(8101)가 응답 · DB에서 3008.1ms · 키보드 50,000원")
+    print("한 줄 읽는 법:  서버 A(8101)가 응답 · DB에서 3008.1ms · SW-AI 50,000원")
     print("               어느 서버가 / 어디서 가져와 / 얼마나 걸려 / 무슨 가격을 보여 줬나")
 
 
@@ -141,9 +141,9 @@ class ScenarioPart:
             note("→ B도 같은 mini-redis를 봄 → A가 저장한 걸 그대로 꺼냄. DB는 한 번만")
 
     def admin_discounts_keyboard_through_server_a(self):
-        self.begin_step(f"③ 관리자가 키보드를 {NEW_PRICE:,}원으로 할인. 요청은 서버 A로 감")
+        self.begin_step(f"③ 관리자가 SW-AI를 {NEW_PRICE:,}원으로 할인. 요청은 서버 A로 감")
         cache_invalidated = request_price_change(self.port_a, NEW_PRICE)["cache_invalidated"]
-        print(f"    서버 A({self.port_a})  가격 수정 → 키보드 {NEW_PRICE:,}원"
+        print(f"    서버 A({self.port_a})  가격 수정 → SW-AI {NEW_PRICE:,}원"
               f"   (캐시 삭제: {cache_invalidated})")
         self.price_has_changed = True
         note(f"→ DB에 {NEW_PRICE:,}원으로 저장하고, {self.cache_of_server_a}에서 인기 상품을 지움")
@@ -209,13 +209,13 @@ class ScenarioPart:
             input("    (Enter를 누르면 진행) ")
 
     def show_popular_products(self, port, server_label):
-        """(가져온 곳, 키보드 가격)을 돌려준다."""
+        """(가져온 곳, SW-AI 가격)을 돌려준다."""
         data = requests.get(f"{HOST}:{port}/products/popular", timeout=30).json()
         price = keyboard_price(data["products"])
         came_from = "캐시에서" if data["source"] == "cache" else "DB에서  "
         stale_mark = "   ← 옛 가격!" if self.price_has_changed and price == OLD_PRICE else ""
         print(f"    서버 {server_label}({port})가 응답 · {came_from} {data['elapsed_ms']:>7.1f}ms"
-              f" · 키보드 {price:,}원{stale_mark}")
+              f" · SW-AI {price:,}원{stale_mark}")
         return data["source"], price
 
     def show_whether_server_b_knows(self, token):
