@@ -173,34 +173,47 @@ class Demo:
         requests.post(f"http://127.0.0.1:{a}/stats/reset", timeout=5)
         result = {}
 
+        local = mode == "local"
+        here = "서버 A 자기 메모리의 캐시" if local else "mini-redis"
+
         self.say("① 서버 A로 인기 상품 조회 (캐시가 비어 있음)")
         self.pause()
         self.popular(a, "A")
+        self.note(f"→ 캐시가 비어 있어 DB에서 50,000원을 가져오고, {here}에 저장")
 
         self.say("② 이번엔 같은 요청이 서버 B로 감 (로드밸런서가 번갈아 보냄)")
         self.pause()
         source, _ = self.popular(b, "B")
         result["b_first"] = source
         result["fill_queries"] = self.db_count(a)
-        if mode == "local":
-            self.note("→ B의 캐시는 A와 따로라 B도 DB에 다시 감 (장면 ④ 같은 데이터를 서버 수만큼 저장)")
+        if local:
+            self.note("→ B의 캐시는 A와 따로라 비어 있음 → B도 DB에 가서 B 자기 캐시에 저장")
+            self.note("  같은 내용이 서버마다 한 벌씩 (장면 ④ 값이 같아도 낭비다)")
         else:
-            self.note("→ A가 채운 캐시를 B도 봄. DB에 한 번만 감")
+            self.note("→ B도 같은 mini-redis를 봄 → A가 저장한 걸 그대로 꺼냄. DB는 한 번만")
 
         self.say(f"③ 관리자가 키보드를 {NEW_PRICE:,}원으로 할인. 요청은 서버 A로 감")
         self.pause()
         self.set_price(a, "A", NEW_PRICE)
         self.price_changed = True
+        self.note(f"→ DB에 {NEW_PRICE:,}원으로 저장하고, {here}에서 인기 상품을 지움")
+        self.note("  캐시에 새 값을 넣지는 않음. 새 값은 다음 조회 때 DB에서 가져와 채움")
+        if local:
+            self.note("  서버 B의 캐시는 A가 지울 수 없음 → B엔 50,000원이 그대로")
+        else:
+            self.note("  mini-redis가 하나뿐이라 이제 어디에도 50,000원이 없음")
 
         self.say("④ 고객이 새로고침 — A로 한 번, B로 한 번")
         self.pause()
         self.popular(a, "A")
         _, b_price = self.popular(b, "B")
         result["b_price"] = b_price
-        if mode == "local":
-            self.note("→ A는 자기 캐시만 지울 수 있음. B의 캐시엔 옛 가격이 남음 (장면 ① 가격이 왔다 갔다)")
+        if local:
+            self.note("→ A: 캐시가 지워졌으니 DB에서 40,000원을 가져와 A 캐시에 저장")
+            self.note("  B: 자기 캐시에 남은 50,000원을 그대로 보여 줌 (장면 ① 새로고침할 때마다 가격이 바뀐다)")
         else:
-            self.note("→ mini-redis 키 하나를 지웠더니 B도 새 가격을 봄")
+            self.note("→ A: mini-redis가 비어 있어 DB에서 40,000원을 가져와 mini-redis에 새로 저장")
+            self.note("  B: A가 방금 저장한 40,000원을 mini-redis에서 바로 꺼냄")
 
         self.say("⑤ 배포: 서버 A를 재시작하고 조회")
         self.pause()
@@ -208,23 +221,29 @@ class Demo:
         self.start(a, mode)
         source, _ = self.popular(a, "A")
         result["after_restart"] = source
-        if mode == "local":
-            self.note("→ 캐시가 서버와 함께 사라져 다시 DB로 (장면 ③ 배포하면 DB가 몰림)")
+        if local:
+            self.note("→ 서버 A 프로그램이 꺼지면서 A 메모리의 캐시도 사라짐 → 다시 DB로")
+            self.note("  (장면 ③ 배포할 때마다 DB가 휘청인다)")
         else:
-            self.note("→ 캐시는 서버 밖에 있어서 재시작해도 그대로")
+            self.note("→ 서버 A 프로그램만 껐다 켬. mini-redis는 다른 프로그램이라 40,000원이 그대로")
+            self.note("  → 재시작 직후에도 DB에 가지 않고 바로 응답")
 
-        self.say("⑥ 고객이 서버 A로 로그인 (세션을 캐시에 저장)")
+        self.say("⑥ 고객이 서버 A로 로그인")
         self.pause()
         token = self.login(a, "A")
+        if local:
+            self.note("→ 로그인 정보(세션)를 서버 A 자기 메모리에 저장")
+        else:
+            self.note("→ 로그인 정보(세션)를 mini-redis에 저장 (키 session:토큰, 30분 유지)")
 
-        self.say("⑦ 다음 요청은 서버 B로 감 — B는 나를 알아볼까?")
+        self.say("⑦ 같은 고객의 다음 요청은 서버 B로 감 — B는 이 고객을 알아볼까?")
         self.pause()
         result["session_b"] = self.me(b, "B", token)
-        if mode == "local":
-            self.note("→ 로그인을 받은 A만 세션을 알고 있음. B에선 로그인이 풀림"
-                      " (장면 ② 로그인이 풀림)")
+        if local:
+            self.note("→ B의 메모리엔 이 세션이 없음 → 로그인이 풀림")
+            self.note("  (장면 ② 로그인했는데 다음 클릭에서 풀린다)")
         else:
-            self.note("→ 세션도 서버 밖 한 곳에 있어서 어느 서버로 가도 로그인 유지")
+            self.note("→ B도 같은 mini-redis에서 세션을 찾음 → 로그인 유지")
 
         result["total_queries"] = self.db_count(a)
         self.say(f"이번 부에서 DB 조회: 총 {result['total_queries']}번"
