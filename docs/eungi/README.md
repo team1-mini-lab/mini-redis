@@ -15,8 +15,6 @@
 | [STEP5.md](./STEP5.md) | 5단계: lock (`Store`가 `HashTable`을 lock 하나로 감쌈) | 완료 |
 | [STEP6.md](./STEP6.md) | 6단계: 입력 검증 (빈 키, null 값, 잘못된 `ttl`에 400) | 완료 |
 | [DECISIONS.md](./DECISIONS.md) | 개인 결정 기록 (확정 / 미결정) | 계속 갱신 |
-| [NOTES.md](../study/NOTES.md) | 공부하며 알게 된 것 (HTTP API, 만료와 무효화, 동시성, 증가 명령) | 계속 갱신 |
-| [REDIS_STUDY.md](../study/REDIS_STUDY.md) | 레디스 공부 노트 (헷갈렸던 질문, 실제 레디스와 비교, redis-cli 실습) | 계속 갱신 |
 
 팀 공유용 "왜 레디스인가" 설명은 [docs/study/WHY_REDIS.md](../study/WHY_REDIS.md)에 있습니다.
 
