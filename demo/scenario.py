@@ -47,7 +47,10 @@ class Demo:
         self.redis_proc = None
         self.db_path = os.path.join(tempfile.mkdtemp(prefix="mini-redis-demo-"), "demo.sqlite3")
         self.env = dict(os.environ, DEMO_DB_PATH=self.db_path, DEMO_DB_DELAY=str(delay),
-                        PYTHONWARNINGS="ignore")
+                        PYTHONWARNINGS="ignore",
+                        # 단계마다 멈춰 설명하는 사이 TTL(기본 60초)이 지나면 캐시가 사라져
+                        # 장면이 재현되지 않는다. 시연에서는 10분으로 늘린다.
+                        DEMO_CACHE_TTL="600")
 
     # ── 서버 띄우고 끄기 ───────────────────────────────────
 
@@ -159,7 +162,7 @@ class Demo:
         result["b_first"] = source
         result["fill_queries"] = self.db_count(a)
         if mode == "local":
-            self.note("→ B의 캐시는 A와 따로라 B도 DB에 다시 감 (장면 ④ 중복)")
+            self.note("→ B의 캐시는 A와 따로라 B도 DB에 다시 감 (장면 ④ 같은 데이터를 서버 수만큼 저장)")
         else:
             self.note("→ A가 채운 캐시를 B도 봄. DB에 한 번만 감")
 
@@ -174,7 +177,7 @@ class Demo:
         _, b_price = self.popular(b, "B")
         result["b_price"] = b_price
         if mode == "local":
-            self.note("→ A는 자기 캐시만 지울 수 있음. B의 캐시엔 옛 가격이 남음 (장면 ①)")
+            self.note("→ A는 자기 캐시만 지울 수 있음. B의 캐시엔 옛 가격이 남음 (장면 ① 가격이 왔다 갔다)")
         else:
             self.note("→ mini-redis 키 하나를 지웠더니 B도 새 가격을 봄")
 
@@ -185,7 +188,7 @@ class Demo:
         source, _ = self.popular(a, "A")
         result["after_restart"] = source
         if mode == "local":
-            self.note("→ 캐시가 서버와 함께 사라져 다시 DB로 (장면 ③)")
+            self.note("→ 캐시가 서버와 함께 사라져 다시 DB로 (장면 ③ 배포하면 DB가 몰림)")
         else:
             self.note("→ 캐시는 서버 밖에 있어서 재시작해도 그대로")
 
@@ -219,7 +222,7 @@ def print_summary(local, redis):
 
     rows = [
         ("② 처음 채울 때 DB 조회 (장면 ④)", f"{local['fill_queries']}번", f"{redis['fill_queries']}번"),
-        ("④ 할인 후 서버 B가 보여 준 가격 (장면 ①)", f"{local['b_price']:,}원", f"{redis['b_price']:,}원"),
+        ("④ 할인 후 서버 B가 본 가격 (장면 ①)", f"{local['b_price']:,}원", f"{redis['b_price']:,}원"),
         ("⑤ 재시작 후 첫 조회 (장면 ③)", src(local["after_restart"]), src(redis["after_restart"])),
         ("전체 DB 조회", f"{local['total_queries']}번", f"{redis['total_queries']}번"),
     ]
