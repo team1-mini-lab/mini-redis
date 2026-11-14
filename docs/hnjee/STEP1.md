@@ -33,13 +33,13 @@ store.py   (HTTP를 모르는 쪽)    값을 넣고, 꺼내고, 지움
 | `server.py` 경로 3개 (`@app.post`, `@app.get`, `@app.delete`) | API 형식은 HTTP | 구현, 테스트, 시연이 쉬움 (DESIGN.md 제안과 같음) |
 | `server.py` 맨 위 (`app.json.ensure_ascii`) | 응답의 한글은 `\uXXXX`로 바꾸지 않고 그대로 보냄 (`ensure_ascii = False`) | 브라우저와 `curl`에서 값을 바로 읽을 수 있음 |
 | `server.py` `store = Store()` · `store.py` `Store` | 저장소는 클래스(`Store`)로 만들고, 서버는 `Store()`를 하나만 만들어 사용 | 테스트마다 빈 저장소를 새로 만들 수 있어 테스트끼리 영향을 주지 않음 |
-| `server.py` `set_value`, `get_value`, `delete_value`의 첫 `if` | 1단계에서는 필수 항목이 빠진 요청만 400으로 처리 (`/set`의 `key`·`value`, `/get`·`/delete`의 `key`). 나머지 검증은 6단계 | 항목이 빠지면 서버가 500 오류를 내므로 최소한만 먼저 막음 |
+| `server.py` `set_value`, `get_value`, `delete_value`의 첫 `if` (6단계에서 검증 함수 호출로 바뀜) | 1단계에서는 필수 항목이 빠진 요청만 400으로 처리 (`/set`의 `key`·`value`, `/get`·`/delete`의 `key`). 나머지 검증은 6단계 | 항목이 빠지면 서버가 500 오류를 내므로 최소한만 먼저 막음 |
 | `server.py` 실패 응답 (`return {"error": ...}, 400` 등) | 실패 응답(400, 404)의 본문은 `{"error": "설명"}` | DESIGN.md에는 상태 코드만 정해져 있음. 원인을 사람이 읽을 수 있게 함 |
 | `server.py` `get_value` · `store.py` `Store.get` | 없는 키를 조회하면 `get`은 `None`, API는 404 | "없음"을 값과 구분되는 방식으로 알림. 404는 HTTP의 표현이므로 저장소가 아니라 서버가 정함 (DESIGN.md 제안과 같음) |
 | `server.py` `delete_value` · `store.py` `Store.delete` | 없는 키를 삭제하면 `delete`는 `False`, API는 200 `{"deleted": false}` | 삭제의 목적은 "값이 없는 상태"이므로 이미 없어도 실패가 아님. 실제로 지웠는지는 본문으로 알림 (DESIGN.md 제안과 같음) |
 | `store.py` `Store.set` | 이미 있는 키에 `set`을 하면 값을 덮어씀 | 캐시 값을 갱신하는 기본 동작 (DESIGN.md 제안과 같음) |
 | `store.py` `Store.set` | `set`의 `ttl` 인자는 4단계에서 추가 | 1단계에서 받기만 하고 무시하면 동작하는 것처럼 보여 혼란을 줌 |
-| `server.py` `check_key` (6단계) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
+| `server.py` `check_key`, `check_set_body` (6단계) | 키는 비어 있지 않은 문자열, 값은 JSON으로 표현할 수 있는 값. 검증은 6단계 | API로 주고받을 수 있는 형태여야 함 (DESIGN.md 제안과 같음) |
 | `server.py` `check_set_body` (6단계) | 값으로 `None`(JSON의 `null`)은 저장할 수 없음. 검증은 6단계 | `get`이 돌려주는 `None`이 항상 "없음"을 뜻하게 하기 위함 (DESIGN.md 제안과 같음) |
 
 [DECISIONS.md](./DECISIONS.md)에도 같은 내용이 모여 있습니다.

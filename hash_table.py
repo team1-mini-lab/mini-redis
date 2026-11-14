@@ -37,9 +37,10 @@ class HashTable:
         old_buckets = self._buckets
         self._buckets = [[] for _ in range(len(old_buckets) * GROWTH_FACTOR)]
         for bucket in old_buckets:
-            for key, value in bucket:
+            for item in bucket:  # item은 (키, 값) 튜플. 새로 만들지 않고 그대로 옮김
+                key = item[0]
                 # 칸 수가 바뀌었으므로 _index가 새 칸 번호를 돌려줌
-                self._buckets[self._index(key)].append((key, value))
+                self._buckets[self._index(key)].append(item)
 
     def get(self, key):
         bucket = self._buckets[self._index(key)]

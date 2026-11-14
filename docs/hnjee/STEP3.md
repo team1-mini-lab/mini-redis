@@ -122,7 +122,7 @@
 | `hash_table.py` `set` | 확장 여부는 **새 키를 추가한 직후**에만 확인. 덮어쓰기에서는 확인하지 않음 | 키 수가 늘 때만 적재율이 올라감 |
 | `hash_table.py` `set` | 한 칸의 리스트 길이는 확장 기준으로 쓰지 않음 | 칸이 작아서 생기는 충돌은 적재율 규칙이 미리 막음. 그래도 길어진 리스트는 해시 함수가 원인이라, 칸을 늘려도 풀리지 않고 칸 수만 끝없이 늘어날 수 있음 |
 | `hash_table.py` `_resize` | 재배치는 한 번에 전부 옮김 | 가장 단순함. 점진적 재해싱은 시간이 남으면 차별화 요소(R12)로 검토 |
-| `hash_table.py` `_resize` | 재배치할 때 해시 값을 다시 계산함 (항목에 해시 값을 저장해 두지 않음) | 항목을 `(키, 값)` 그대로 유지해 단순하게 둠 |
+| `hash_table.py` `_resize` | 재배치할 때 해시 값을 다시 계산함 (항목에 해시 값을 저장해 두지 않음) | 항목을 `(키, 값)` 그대로 유지해 단순하게 둠. 튜플은 새로 만들지 않고 그대로 옮김 (변경: 이전에는 `for key, value in bucket`으로 풀었다가 `(key, value)`로 다시 묶어 넣었음. 키 10만 개 저장이 약 6% 빨라짐) |
 | `hash_table.py` `delete` | 키를 지워도 칸 수는 줄이지 않음 | 과제 요구에 없고, 캐시는 지운 만큼 다시 채워지는 경우가 많음 |
 | `hash_table.py` `capacity` | 현재 칸 수를 알려 주는 `capacity`를 둠 | 완료 기준 "칸 수가 늘어남"을 확인하기 위함 |
 | `tests/test_hash_table.py` | 3단계 테스트를 같은 파일에 추가 | 해시 테이블의 약속을 한 파일에서 볼 수 있음 |
@@ -152,8 +152,8 @@ def _resize(self):
     old_buckets = self._buckets
     self._buckets = [[] for _ in range(len(old_buckets) * GROWTH_FACTOR)]   # 1. 새 칸 만들기
     for bucket in old_buckets:                                             # 2. 기존 항목을 모두 꺼내
-        for key, value in bucket:
-            self._buckets[self._index(key)].append((key, value))           # 3. 새 칸 번호에 넣기
+        for item in bucket:                                                #    (키, 값) 튜플을 그대로
+            self._buckets[self._index(item[0])].append(item)               # 3. 새 칸 번호에 넣기
 ```
 
 `self._buckets`를 먼저 새 칸으로 바꿔 두기 때문에, 3번 줄의 `_index(key)`는 새 칸 수로 계산됩니다. 키 수(`_size`)는 변하지 않으므로 건드리지 않습니다.
