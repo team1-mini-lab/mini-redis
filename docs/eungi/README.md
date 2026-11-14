@@ -14,7 +14,7 @@
 | [STEP4.md](./STEP4.md) | 4단계: 만료 (`expire_at` 저장, 조회할 때 확인하는 지연 삭제) | 완료 |
 | [STEP5.md](./STEP5.md) | 5단계: lock (`Store`가 `HashTable`을 lock 하나로 감쌈) | 완료 |
 | [STEP6.md](./STEP6.md) | 6단계: 입력 검증 (빈 키, null 값, 잘못된 `ttl`에 400) | 완료 |
-| [DECISIONS.md](./DECISIONS.md) | 개인 결정 기록 (확정 / 미결정) | 계속 갱신 |
+| [DECISIONS.md](./DECISIONS.md) | 개인 결정 기록 (확정 / 미결정) | 완료 |
 
 팀 공유용 "왜 레디스인가" 설명은 [docs/study/WHY_REDIS.md](../study/WHY_REDIS.md)에 있습니다.
 
