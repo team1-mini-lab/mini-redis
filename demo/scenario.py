@@ -1,8 +1,8 @@
 """시연: 서버가 여러 대가 되면 로컬 캐시와 mini-redis가 어떻게 다른가.
 
 3차 체크인 코치 피드백("서버가 여러 대가 되면?")과 발표한 다섯 장면 중
-①(가격이 왔다 갔다), ③(재시작하면 캐시가 사라짐), ④(같은 데이터를 서버마다 따로 조회)를
-실제 서버 두 대로 재현한다.
+①(가격이 왔다 갔다), ②(로그인이 풀림), ③(재시작하면 캐시가 사라짐),
+④(같은 데이터를 서버마다 따로 조회)를 실제 서버 두 대로 재현한다.
 
 같은 데모 API 코드를 두 대씩 띄우고, 캐시만 바꿔 끼운 뒤 똑같은 순서로 요청을 보낸다.
     1부  로컬 캐시   서버 A(8101), 서버 B(8102)   캐시가 각 서버 안 dict에
@@ -31,6 +31,7 @@ REDIS_URL = "http://127.0.0.1:8000"
 KEYBOARD = 1
 OLD_PRICE = 50000
 NEW_PRICE = 40000
+USER = "eungi"
 
 PARTS = [
     {"mode": "local", "title": "1부  로컬 캐시 (캐시가 각 서버 안에)", "ports": (8101, 8102)},
@@ -120,6 +121,26 @@ class Demo:
         print(f"    서버 {label}({port})  가격 수정 → 키보드 {price:,}원"
               f"   (캐시 삭제: {data['cache_invalidated']})")
 
+    def login(self, port, label):
+        """로그인하고 토큰을 받는다. 세션은 그 서버가 쓰는 캐시에 저장된다."""
+        data = requests.post(f"http://127.0.0.1:{port}/login",
+                             json={"user": USER}, timeout=10).json()
+        print(f"    서버 {label}({port})가 응답 · 로그인 성공 · 사용자 {data['user']}"
+              f" (토큰 {data['token']})")
+        return data["token"]
+
+    def me(self, port, label, token):
+        """이 서버가 그 세션을 알아보는지 본다. 알아보면 True, 401이면 False."""
+        response = requests.get(f"http://127.0.0.1:{port}/me",
+                                params={"token": token}, timeout=10)
+        if response.status_code == 200:
+            print(f"    서버 {label}({port})가 응답 · 알아봄   ·"
+                  f" {response.json()['user']}님 환영합니다")
+            return True
+        print(f"    서버 {label}({port})가 응답 · 모름     ·"
+              f" 401 로그인이 필요합니다   ← 로그인이 풀림!")
+        return False
+
     def db_count(self, port):
         return requests.get(f"http://127.0.0.1:{port}/stats", timeout=5).json()["db_query_count"]
 
@@ -192,8 +213,22 @@ class Demo:
         else:
             self.note("→ 캐시는 서버 밖에 있어서 재시작해도 그대로")
 
+        self.say("⑥ 고객이 서버 A로 로그인 (세션을 캐시에 저장)")
+        self.pause()
+        token = self.login(a, "A")
+
+        self.say("⑦ 다음 요청은 서버 B로 감 — B는 나를 알아볼까?")
+        self.pause()
+        result["session_b"] = self.me(b, "B", token)
+        if mode == "local":
+            self.note("→ 로그인을 받은 A만 세션을 알고 있음. B에선 로그인이 풀림"
+                      " (장면 ② 로그인이 풀림)")
+        else:
+            self.note("→ 세션도 서버 밖 한 곳에 있어서 어느 서버로 가도 로그인 유지")
+
         result["total_queries"] = self.db_count(a)
-        self.say(f"이번 부에서 DB 조회: 총 {result['total_queries']}번")
+        self.say(f"이번 부에서 DB 조회: 총 {result['total_queries']}번"
+                 "   (세션은 DB를 쓰지 않음)")
         self.stop(a)
         self.stop(b)
         return result
@@ -220,10 +255,14 @@ def print_summary(local, redis):
     def src(s):
         return "캐시" if s == "cache" else "DB"
 
+    def known(flag):
+        return "알아봄" if flag else "모름(401)"
+
     rows = [
         ("② 처음 채울 때 DB 조회 (장면 ④)", f"{local['fill_queries']}번", f"{redis['fill_queries']}번"),
         ("④ 할인 후 서버 B가 본 가격 (장면 ①)", f"{local['b_price']:,}원", f"{redis['b_price']:,}원"),
         ("⑤ 재시작 후 첫 조회 (장면 ③)", src(local["after_restart"]), src(redis["after_restart"])),
+        ("⑦ 서버 B가 로그인을 알아보나 (장면 ②)", known(local["session_b"]), known(redis["session_b"])),
         ("전체 DB 조회", f"{local['total_queries']}번", f"{redis['total_queries']}번"),
     ]
     print("\n" + "━" * 64)

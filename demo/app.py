@@ -23,6 +23,7 @@
 import argparse
 import os
 import time
+import uuid
 
 from flask import Flask, jsonify, request
 
@@ -33,8 +34,13 @@ app = Flask(__name__)
 app.json.ensure_ascii = False
 
 POPULAR_KEY = "popular_products"   # 접점 합의: 캐시 키 이름
-POPULAR_TTL = 60                   # 접점 합의: TTL 60초
+# 접점 합의: TTL 60초. 시연 스크립트는 단계마다 멈춰 설명하는 사이 만료되지 않도록
+# DEMO_CACHE_TTL로 길게 바꿔 쓴다.
+POPULAR_TTL = float(os.environ.get("DEMO_CACHE_TTL", "60"))
 POPULAR_LIMIT = 3
+
+# 세션 보관 시간. 로그인 유지 시간이 그대로 TTL이 된다 (장면 ② 로그인이 풀림).
+SESSION_TTL = float(os.environ.get("DEMO_SESSION_TTL", "1800"))   # 30분
 
 # 실행할 때 main()에서 정한다. import만 했을 때(테스트 등)는 기본값을 쓴다.
 PORT = int(os.environ.get("DEMO_PORT", "8001"))
@@ -135,6 +141,58 @@ def get_product(product_id):
     if product is None:
         return jsonify({"error": "없는 상품입니다"}), 404
     return jsonify(product)
+
+
+def _session_key(token):
+    return f"session:{token}"
+
+
+@app.post("/login")
+def login():
+    """로그인: 세션을 캐시에 저장하고 토큰을 돌려준다 (장면 ② 로그인이 풀림).
+
+    세션도 결국 키-값이라 인기 상품과 똑같은 set / get을 쓴다. 따로 만든 기능이 없다.
+    로컬 캐시라면 로그인을 받은 서버만 이 세션을 알고, 공용 저장소라면 어느 서버든 안다.
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("user"), str) or not body["user"]:
+        return jsonify({"error": "본문에 user가 필요합니다"}), 400
+
+    token = uuid.uuid4().hex[:8]
+    cache.set(_session_key(token), body["user"], ttl=SESSION_TTL)
+
+    return jsonify({
+        "server": _server_name(),
+        "token": token,
+        "user": body["user"],
+        "ttl": SESSION_TTL,
+    })
+
+
+@app.get("/me")
+def me():
+    """내가 누구인지: /me?token=... 세션이 없거나 만료되면 401 (로그인이 풀린 상태).
+
+    로그인을 서버 A로 했는데 이 요청이 서버 B로 갔을 때 무엇이 나오는지가 장면 ②다.
+    """
+    token = request.args.get("token", "")
+    if not token:
+        return jsonify({"error": "token이 필요합니다"}), 400
+
+    user = cache.get(_session_key(token))
+    if user is None:
+        return jsonify({"server": _server_name(), "error": "로그인이 필요합니다"}), 401
+
+    return jsonify({"server": _server_name(), "user": user})
+
+
+@app.post("/logout")
+def logout():
+    """로그아웃: 세션 키를 지운다. 공용 저장소라면 모든 서버에서 한 번에 풀린다."""
+    token = request.args.get("token", "")
+    if not token:
+        return jsonify({"error": "token이 필요합니다"}), 400
+    return jsonify({"server": _server_name(), "logged_out": cache.delete(_session_key(token))})
 
 
 @app.get("/stats")
