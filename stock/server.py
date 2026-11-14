@@ -14,7 +14,7 @@ from flask import Flask, Response, jsonify, request
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 app.json.ensure_ascii = False
 
-HOST = "127.0.0.1"
+HOST = os.environ.get("STOCK_HOST", "127.0.0.1")
 PORT = int(os.environ.get("STOCK_PORT", "8010"))
 DEMO_API_URL = os.environ.get("STOCK_DEMO_API_URL", "http://127.0.0.1:8001")
 FORWARDED_METHODS = ["GET", "POST", "PUT", "DELETE"]
@@ -55,8 +55,9 @@ def demo_api_is_down():
 
 
 def main():
-    global PORT, DEMO_API_URL
+    global HOST, PORT, DEMO_API_URL
     args = parse_arguments()
+    HOST = args.host
     PORT = args.port
     DEMO_API_URL = args.demo_api
     print(f"주식 화면 http://{HOST}:{PORT} (데모 API {DEMO_API_URL})")
@@ -65,6 +66,7 @@ def main():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="mini-redis 주식 화면 서버")
+    parser.add_argument("--host", default=HOST, help="받을 주소 (기본 127.0.0.1, 배포할 때는 0.0.0.0)")
     parser.add_argument("--port", type=int, default=PORT, help="포트 (기본 8010)")
     parser.add_argument("--demo-api", default=DEMO_API_URL, help="데모 API 주소 (기본 http://127.0.0.1:8001)")
     return parser.parse_args()
