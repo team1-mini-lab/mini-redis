@@ -8,7 +8,7 @@ class Node:
         self.next = next
 
     def is_expired(self):
-        return self.expire_at is not None and time.time() >= self.expire_at
+        return self.expire_at is not None and time.monotonic() >= self.expire_at
     
 class HashTable:
     """해시 테이블 저장소.
@@ -20,7 +20,7 @@ class HashTable:
         self.size = 0  
 
     def set(self, key, value, ttl=None):
-        expire_at = time.time() + ttl if ttl is not None else None
+        expire_at = time.monotonic() + ttl if ttl is not None else None
         index = self._get_bucket_index(key)
         head = self.buckets[index]
         node = head
@@ -50,8 +50,14 @@ class HashTable:
                 self.buckets[index] = current   
                 current = next_node
 
+    def _hash(self, key):
+        h = 0
+        for ch in str(key):
+            h = (h * 131 + ord(ch)) % (2**61 - 1)
+        return h
+
     def _get_bucket_index(self, key):
-        return hash(key) % self.capacity
+        return self._hash(key) % self.capacity
     
     def get(self, key):
         index = self._get_bucket_index(key)
