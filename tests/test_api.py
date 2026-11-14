@@ -11,11 +11,11 @@ class ApiTest(unittest.TestCase):
         self.client = server.app.test_client()  # 서버를 띄우지 않고 요청을 보내는 Flask 도구
 
     def test_set_get_delete(self):
-        res = self.client.post("/set", json={"key": "name", "value": "현지"})
+        res = self.client.post("/set", json={"key": "name", "value": "정글전자"})
         self.assertEqual((res.status_code, res.get_json()), (200, {"ok": True}))
 
         res = self.client.get("/get?key=name")
-        self.assertEqual((res.status_code, res.get_json()), (200, {"key": "name", "value": "현지"}))
+        self.assertEqual((res.status_code, res.get_json()), (200, {"key": "name", "value": "정글전자"}))
 
         res = self.client.delete("/delete?key=name")
         self.assertEqual((res.status_code, res.get_json()), (200, {"deleted": True}))

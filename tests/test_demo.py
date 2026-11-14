@@ -143,14 +143,14 @@ class TwoServersTest(DemoTestCase):
         self.assertEqual(b_price, 40000)      # 키 하나 지우면 모두 새 값
 
     def test_session_local_cache_logs_out_on_other_server(self):
-        token = self.on(LocalCache()).post("/login", json={"user": "eungi"}).get_json()["token"]
+        token = self.on(LocalCache()).post("/login", json={"user": "guest"}).get_json()["token"]
         res = self.on(LocalCache()).get(f"/me?token={token}")
         self.assertEqual(res.status_code, 401)     # 장면 ② 로그인이 풀림
 
     def test_session_mini_redis_keeps_login(self):
-        token = self.on(InProcessMiniRedis()).post("/login", json={"user": "eungi"}).get_json()["token"]
+        token = self.on(InProcessMiniRedis()).post("/login", json={"user": "guest"}).get_json()["token"]
         res = self.on(InProcessMiniRedis()).get(f"/me?token={token}")
-        self.assertEqual((res.status_code, res.get_json()["user"]), (200, "eungi"))
+        self.assertEqual((res.status_code, res.get_json()["user"]), (200, "guest"))
 
         self.on(InProcessMiniRedis()).post(f"/logout?token={token}")
         res = self.on(InProcessMiniRedis()).get(f"/me?token={token}")

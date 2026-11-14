@@ -12,8 +12,8 @@ def same_bucket(key):
 class HashTableTest(unittest.TestCase):
     def test_put_then_get(self):
         t = HashTable()
-        self.assertTrue(t.put("name", "현지"))
-        self.assertEqual(t.get("name"), "현지")
+        self.assertTrue(t.put("name", "정글전자"))
+        self.assertEqual(t.get("name"), "정글전자")
         self.assertEqual(len(t), 1)
 
     def test_put_same_key_overwrites(self):
@@ -44,15 +44,15 @@ class HashTableTest(unittest.TestCase):
 
     def test_debug_dump_shows_chain(self):
         t = HashTable(capacity=4, hash_fn=same_bucket)
-        t.put("name", "현지")
+        t.put("name", "정글전자")
         t.put("age", 25)
-        self.assertIn("[0] (age → 25) → (name → 현지)", t.debug_dump())
+        self.assertIn("[0] (age → 25) → (name → 정글전자)", t.debug_dump())
 
     def test_unicode_keys(self):
         t = HashTable()
-        t.put("현지", 1)
+        t.put("한글", 1)
         t.put("🙂", 2)
-        self.assertEqual((t.get("현지"), t.get("🙂")), (1, 2))
+        self.assertEqual((t.get("한글"), t.get("🙂")), (1, 2))
 
     def test_fnv1a_known_values(self):
         # FNV-1a 64비트 공식 테스트 값

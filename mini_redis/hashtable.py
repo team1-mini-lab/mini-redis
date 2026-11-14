@@ -1,40 +1,18 @@
-"""직접 만든 해시 테이블 (2단계: 체이닝, 3단계: 칸 수 확장).
+"""체이닝으로 충돌을 처리하고, 가득 차면 칸 수를 늘리는 해시 테이블.
 
-파이썬 dict를 쓰지 않는다. 칸 배열만 list로 두고, 해시 계산과 충돌 처리는 직접 한다.
-이 파일은 만료, lock, HTTP를 모른다. 키로 값을 넣고, 찾고, 지우는 일만 한다.
+파이썬 dict를 쓰지 않는다. 칸 배열만 list로 두고 해시 계산, 충돌 처리, 확장은 직접 한다.
 """
 
 
-def fnv1a(key):
-    """문자열 키를 64비트 숫자로 바꾸는 해시 함수 (FNV-1a).
-
-    키의 바이트를 하나씩 섞는다: XOR로 바이트를 넣고, 큰 소수를 곱해 퍼뜨린다.
-    같은 키는 언제 실행해도 같은 숫자가 나온다.
-    """
-    h = 14695981039346656037                      # 시작값 (offset basis)
-    for byte in key.encode("utf-8"):
-        h ^= byte
-        h = (h * 1099511628211) & 0xFFFFFFFFFFFFFFFF  # 소수를 곱하고 64비트로 자름
-    return h
-
-
-class _Node:
-    """체인의 한 항목. 같은 칸에 배정된 키들을 next로 이어 붙인다."""
-
-    def __init__(self, key, value, next):
-        self.key = key      # 키도 함께 저장해야 같은 칸의 다른 키와 구분할 수 있다
-        self.value = value
-        self.next = next
-
-
 class HashTable:
-    MAX_LOAD = 0.75   # 저장된 개수 ÷ 칸 수가 이 값을 넘으면 확장한다
-    GROWTH = 2        # 확장할 때 칸 수를 몇 배로 늘릴지
+    INITIAL_CAPACITY = 8
+    MAX_LOAD_FACTOR = 0.75
+    GROWTH_FACTOR = 2
 
-    def __init__(self, capacity=8, hash_fn=fnv1a):
-        self._buckets = [None] * capacity  # 칸 배열. 각 칸은 체인의 첫 노드 또는 None
-        self._size = 0                     # 저장된 키 개수
-        self._hash = hash_fn               # 테스트에서 일부러 충돌을 만들 때 바꿔 끼운다
+    def __init__(self, capacity=INITIAL_CAPACITY, hash_fn=None):
+        self._buckets = [None] * capacity
+        self._size = 0
+        self._hash = hash_fn or fnv1a
 
     @property
     def capacity(self):
@@ -43,73 +21,103 @@ class HashTable:
     def __len__(self):
         return self._size
 
-    def _index(self, key):
-        """키가 들어갈 칸 번호: 해시값을 칸 수로 나눈 나머지."""
-        return self._hash(key) % len(self._buckets)
-
     def put(self, key, value):
-        """저장한다. 새 키면 True, 이미 있어서 덮어썼으면 False."""
-        i = self._index(key)
-        node = self._buckets[i]
-        while node is not None:            # 체인을 따라가며 같은 키가 있는지 찾는다
-            if node.key == key:
-                node.value = value
-                return False
-            node = node.next
-        self._buckets[i] = _Node(key, value, self._buckets[i])  # 체인 맨 앞에 붙인다
-        self._size += 1
-        if self._size / len(self._buckets) > self.MAX_LOAD:     # 넘을 때만 확장 (같으면 그대로)
-            self._resize(len(self._buckets) * self.GROWTH)
+        """새 키를 넣었으면 True, 있던 키의 값을 덮어썼으면 False."""
+        node = self._find_node(key)
+        if node is not None:
+            node.value = value
+            return False
+        self._prepend_node(key, value)
+        if self._is_overloaded():
+            self._grow()
         return True
 
-    def _resize(self, new_capacity):
-        """칸 수를 늘리고 모든 항목을 새 위치로 옮긴다.
-
-        칸 수가 바뀌면 "해시값 % 칸 수"의 결과도 바뀌므로, 항목마다 칸 번호를 다시 계산해야 한다.
-        """
-        old_buckets = self._buckets
-        self._buckets = [None] * new_capacity
-        for node in old_buckets:
-            while node is not None:
-                next_node = node.next              # 옮기면 next가 바뀌므로 미리 기억해 둔다
-                i = self._index(node.key)          # 새 칸 수로 다시 계산
-                node.next = self._buckets[i]       # 기존 노드를 새 칸의 맨 앞에 그대로 옮겨 붙인다
-                self._buckets[i] = node
-                node = next_node
-
     def get(self, key, default=None):
-        """값을 돌려준다. 없으면 default."""
-        node = self._buckets[self._index(key)]
-        while node is not None:
-            if node.key == key:
-                return node.value
-            node = node.next
-        return default
+        node = self._find_node(key)
+        return default if node is None else node.value
 
     def remove(self, key):
-        """지웠으면 True, 없었으면 False."""
-        i = self._index(key)
-        prev = None
-        node = self._buckets[i]
+        """지웠으면 True, 없던 키면 False."""
+        index = self._bucket_index(key)
+        previous = None
+        node = self._buckets[index]
         while node is not None:
             if node.key == key:
-                if prev is None:
-                    self._buckets[i] = node.next   # 체인의 첫 노드를 지움
-                else:
-                    prev.next = node.next          # 앞 노드가 다음 노드를 가리키게 해서 끊어냄
-                self._size -= 1
+                self._unlink(index, previous, node)
                 return True
-            prev = node
+            previous = node
             node = node.next
         return False
 
     def debug_dump(self):
-        """칸별 체인을 문자열로 보여 준다. 충돌이 체인으로 이어진 것을 눈으로 확인하는 용도."""
-        lines = []
-        for i, node in enumerate(self._buckets):
-            chain = []
-            while node is not None:
-                chain.append(f"({node.key} → {node.value})")
-                node = node.next
-            lines.append(f"[{i}] " + " → ".join(chain))
-        return "\n".join(lines)
+        """칸마다 이어진 체인을 한 줄씩 보여 준다."""
+        return "\n".join(
+            f"[{index}] " + " → ".join(f"({node.key} → {node.value})" for node in _chain(head))
+            for index, head in enumerate(self._buckets)
+        )
+
+    def _bucket_index(self, key):
+        return self._hash(key) % len(self._buckets)
+
+    def _find_node(self, key):
+        for node in _chain(self._buckets[self._bucket_index(key)]):
+            if node.key == key:
+                return node
+        return None
+
+    def _prepend_node(self, key, value):
+        index = self._bucket_index(key)
+        self._buckets[index] = _Node(key, value, self._buckets[index])
+        self._size += 1
+
+    def _unlink(self, index, previous, node):
+        if previous is None:
+            self._buckets[index] = node.next
+        else:
+            previous.next = node.next
+        self._size -= 1
+
+    def _is_overloaded(self):
+        return self._size / len(self._buckets) > self.MAX_LOAD_FACTOR
+
+    def _grow(self):
+        old_buckets = self._buckets
+        self._buckets = [None] * (len(old_buckets) * self.GROWTH_FACTOR)
+        for head in old_buckets:
+            for node in _chain(head):
+                self._move_node_to_new_bucket(node)
+
+    def _move_node_to_new_bucket(self, node):
+        index = self._bucket_index(node.key)
+        node.next = self._buckets[index]
+        self._buckets[index] = node
+
+
+class _Node:
+    def __init__(self, key, value, next):
+        self.key = key
+        self.value = value
+        self.next = next
+
+
+def _chain(head):
+    """head부터 next를 따라가며 노드를 하나씩 내준다. 순회 중에 node.next를 바꿔도 안전하다."""
+    node = head
+    while node is not None:
+        following = node.next
+        yield node
+        node = following
+
+
+FNV_OFFSET_BASIS = 14695981039346656037
+FNV_PRIME = 1099511628211
+MASK_64_BITS = 0xFFFFFFFFFFFFFFFF
+
+
+def fnv1a(key):
+    """FNV-1a 64비트 해시. 같은 문자열은 언제 실행해도 같은 숫자가 된다."""
+    hashed = FNV_OFFSET_BASIS
+    for byte in key.encode("utf-8"):
+        hashed ^= byte
+        hashed = (hashed * FNV_PRIME) & MASK_64_BITS
+    return hashed

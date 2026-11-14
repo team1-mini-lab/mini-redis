@@ -88,9 +88,9 @@ python -m demo.app --port 8001
 python -m demo.app --port 8002
 
 TOKEN=$(curl -s -X POST localhost:8001/login \
-        -H "Content-Type: application/json" -d '{"user":"eungi"}' | python -c 'import json,sys;print(json.load(sys.stdin)["token"])')
+        -H "Content-Type: application/json" -d '{"user":"guest"}' | python -c 'import json,sys;print(json.load(sys.stdin)["token"])')
 
-curl "localhost:8002/me?token=$TOKEN"       # {"user":"eungi"}  — 다른 서버인데 알아봄
+curl "localhost:8002/me?token=$TOKEN"       # {"user":"guest"}  — 다른 서버인데 알아봄
 curl -X POST "localhost:8001/logout?token=$TOKEN"
 curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 — 모든 서버에서 풀림
 ```
