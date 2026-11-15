@@ -209,6 +209,8 @@ mini-redis를 만들며 따른 요구사항, 팀이 내린 결정, 데모와 측
 
 ## 데모 API 설계
 
+8단계 데모 API와 9단계 성능 비교는 김은기가 만들었습니다.
+
 데모 API는 mini-redis를 DB 앞의 캐시로 쓰는 앱입니다. 거래량 상위 종목 목록을 조회하는 흐름은 이렇습니다.
 
 1. 먼저 mini-redis에서 찾습니다.
@@ -281,5 +283,7 @@ TTL은 무효화를 대신하는 것이 아니라 안전망입니다. 가격을 
 **다시 재는 방법**
 
 mini-redis와 데모 API를 띄운 뒤 `python -m bench.benchmark --markdown`을 실행합니다. 결과는 [성능 비교](./performance.md) 문서에 있습니다.
+
+데모 API와 성능 비교를 어떻게 검증했는지는 [demo/README.md](../../demo/README.md)에 있습니다. 설계 결정 표의 "확인" 칸에 결정마다 확인한 테스트를 적었습니다.
 
 원문: [demo/README.md](../../demo/README.md), [bench/benchmark.py](../../bench/benchmark.py)
