@@ -31,7 +31,7 @@ mini-redis를 직접 만들면서, 다섯 문제의 원인이 모두 같다는 �
 
 ## 2. 실행 방법
 
-배포된 화면: https://mini-stock-tu7t.onrender.com (Render 무료, 15분 동안 아무도 안 쓰면 잠들어 첫 접속이 30초쯤 걸립니다)
+https://mini-stock-tu7t.onrender.com
 
 ```bash
 python -m venv .venv
