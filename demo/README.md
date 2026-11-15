@@ -212,9 +212,4 @@ python docs/eungi/check_tests_catch_bugs.py   # 다시 돌려 보기
 
 실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
 
-데모 API와 성능 비교를 팀에 설명한 발표 자료는 [feat/8-demo 브랜치의 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다.
-
-| 파일 | 여는 방법 |
-|---|---|
-| 발표 슬라이드 (PDF) | GitHub에서 바로 열립니다 |
-| 발표 화면 (HTML) | 내려받아 브라우저로 열면 서버 A·B 화면이 움직이는 모습을 볼 수 있습니다 |
+데모 API와 성능 비교를 팀에 설명한 발표 자료는 [feat/8-demo 브랜치의 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. HTML 파일은 내려받아 브라우저로 열어야 보입니다.
