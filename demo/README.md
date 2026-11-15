@@ -197,4 +197,4 @@ python -m unittest tests.test_demo -v      # 22개, 3초 안에 끝남
 
 실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
 
-데모 API와 성능 비교를 어떻게 만들고 검증했는지 설명한 발표 자료는 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. 슬라이드 PDF는 바로 열어 볼 수 있고, 서버 A·B 화면이 움직이는 모습은 HTML 파일을 내려받아 브라우저로 열면 볼 수 있습니다.
+데모 API와 성능 비교를 어떻게 만들고 검증했는지 설명한 팀 내 발표 자료는 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. 슬라이드 PDF는 바로 열어 볼 수 있고, 서버 A·B 화면이 움직이는 모습은 HTML 파일을 내려받아 브라우저로 열면 볼 수 있습니다.
