@@ -284,6 +284,8 @@ TTL은 무효화를 대신하는 것이 아니라 안전망입니다. 가격을 
 
 mini-redis와 데모 API를 띄운 뒤 `python -m bench.benchmark --markdown`을 실행합니다. 결과는 [성능 비교](./performance.md) 문서에 있습니다.
 
-데모 API와 성능 비교를 어떻게 검증했는지는 [demo/README.md](../../demo/README.md)에 있습니다. 설계 결정 표의 "확인 방법" 칸에 결정마다 짝이 되는 테스트나 시연을 적었고, 테스트를 추가한 과정과 변이 검사 결과는 [docs/eungi/TEST_RECORD.md](../eungi/TEST_RECORD.md)에 있습니다.
+데모 API와 성능 비교를 어떻게 검증했는지는 [demo/README.md](../../demo/README.md)에 있습니다. 설계 결정 표의 "확인 방법" 칸에 결정마다 짝이 되는 테스트나 시연을 적었습니다.
+
+테스트를 추가한 과정과 변이 검사 결과는 [docs/eungi/TEST_RECORD.md](../eungi/TEST_RECORD.md)에 있습니다.
 
 원문: [demo/README.md](../../demo/README.md), [bench/benchmark.py](../../bench/benchmark.py)
