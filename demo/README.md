@@ -96,28 +96,30 @@ curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 �
 ```
 
 `--cache local`로 띄운 두 대에 같은 순서로 보내면 첫 `/me`부터 401이 나옵니다. 로그인을 받은 서버만 세션을 알기 때문입니다.
-
-## 데모 API와 성능 비교의 설계 결정
-
-| | 결정 | 이유 |
+| 결정 | 이유 | 확인 |
 |---|---|---|
-| 구조 | mini-redis를 HTTP로 호출 | 과제의 "외부에서 사용". import하면 같은 프로세스라 공용 저장소를 보여 줄 수 없음 |
-| | 가짜 DB는 SQLite 파일 | 서버를 여러 대 띄워도 원본은 하나여야 함. dict로 두면 서버마다 DB가 따로 생겨 시연이 성립하지 않음. 실제 서비스도 앱 서버는 여러 대, DB는 공유 |
-| | 로컬 캐시 모드(`--cache local`)를 일부러 둠 | 문제가 생기는 모습을 먼저 봐야 mini-redis로 풀리는 게 보임. 앱 코드는 그대로 두고 캐시만 바꿔 끼워 비교 |
-| | 로컬 캐시도 mini-redis와 같은 TTL·지연 삭제로 구현 | 시연의 1부(로컬 캐시)와 2부(mini-redis)의 차이가 캐시 위치 하나뿐이어야 비교가 성립함 |
-| 조회와 무효화 | 조회는 Cache-Aside | 앱이 캐시를 먼저 보고, 없으면 DB에서 가져와 저장. 캐시가 없어도 DB로 동작하므로 장애 대비(아래)가 가능함 |
-| | 쓰기 때 캐시를 덮어쓰지 않고 지움 | 덮어쓰면 "DB 수정"과 "캐시 수정" 순서가 어긋날 때 옛 값이 남을 수 있음. 지우면 다음 읽기가 반드시 DB에서 최신 값을 가져옴 |
-| | DB 먼저 고치고, 그다음 캐시 삭제 | 캐시를 먼저 지우면, DB를 고치기 전에 다른 요청이 옛 값을 다시 캐시에 채울 수 있음 |
-| | 종목 하나가 바뀌어도 목록 키 전체를 지움 | 거래량 상위 목록을 키 하나에 통째로 저장하기 때문. 그 종목만 골라 고치는 것보다 단순하고, 다음 조회 한 번으로 다시 채워짐 |
-| | 캐시 삭제가 실패해도 가격 수정은 성공으로 처리 | 원본(DB)이 맞는 게 우선. 응답의 `cache_invalidated: false`로 알리고, 남은 옛 값은 TTL이 지나면 사라짐 |
-| 만료(TTL) | TTL 60초를 함께 줌 | 무효화를 깜빡해도 60초 뒤엔 사라지는 안전망. 시연 스크립트만 환경변수로 600초. 근거는 아래 「TTL 60초는 어떻게 정했나」 |
-| | 세션에 별도 기능을 만들지 않음 | 세션도 키-값이라 거래량 상위 종목과 같은 set / get으로 끝남. 로그인 유지 시간이 그대로 TTL이 됨 (`DEMO_SESSION_TTL`, 기본 30분). 30분은 흔히 쓰는 로그인 유지 시간(30분~하루) 중 짧은 쪽 |
-| 장애 대비 | mini-redis가 죽어도 DB로 응답 | 캐시는 성능 문제일 뿐 기능 문제가 아님. 통신 실패를 "캐시 미스"로 처리 (Cache-Aside라 가능) |
-| | mini-redis 호출 타임아웃 1초 (`cache.py`의 `TIMEOUT_SECONDS`) | mini-redis가 응답하지 않을 때 고객이 오래 기다리지 않고 바로 DB로 넘어가게 |
-| 성능 비교 | 캐시 미사용은 `?nocache=1`로 | 같은 코드 경로에서 캐시만 빼서, 다른 조건은 똑같이 유지 |
-| | 첫 조회(미스)와 이후(히트)를 따로 측정 | 섞어서 평균을 내면 측정 횟수에 따라 숫자가 달라져 뜻이 없어짐 |
-| | 시간은 클라이언트(벤치마크)에서 잼 | 고객이 실제로 기다리는 시간이라서. 서버가 돌려주는 `elapsed_ms`에는 네트워크 왕복이 빠짐 |
-| | 응답 시간과 함께 DB 조회 횟수를 셈 | 캐시의 목적은 DB 보호. 배수는 가짜 DB 지연에 따라 달라지지만, 막은 건수는 그렇지 않음 |
+| **구조** | | |
+| mini-redis를 HTTP로 호출 | 과제의 "외부에서 사용". import하면 같은 프로세스라 공용 저장소를 보여 줄 수 없음 | 모든 테스트가 실제 `mini_redis/server.py`에 HTTP 요청을 보냄 |
+| 가짜 DB는 SQLite 파일 | 서버를 여러 대 띄워도 원본은 하나여야 함. dict로 두면 서버마다 DB가 따로 생겨 시연이 성립하지 않음. 실제 서비스도 앱 서버는 여러 대, DB는 공유 | `test_local_cache_goes_stale`, `test_mini_redis_stays_consistent` |
+| 로컬 캐시 모드(`--cache local`)를 일부러 둠 | 문제가 생기는 모습을 먼저 봐야 mini-redis로 풀리는 게 보임. 앱 코드는 그대로 두고 캐시만 바꿔 끼워 비교 | 위와 같음 |
+| 로컬 캐시도 mini-redis와 같은 TTL·지연 삭제로 구현 | 시연의 1부(로컬 캐시)와 2부(mini-redis)의 차이가 캐시 위치 하나뿐이어야 비교가 성립함 | `test_local_cache_expires_the_same_way` |
+| **조회와 무효화** | | |
+| 조회는 Cache-Aside | 앱이 캐시를 먼저 보고, 없으면 DB에서 가져와 저장. 캐시가 없어도 DB로 동작하므로 장애 대비(아래)가 가능함 | `test_second_read_comes_from_cache` |
+| 쓰기 때 캐시를 덮어쓰지 않고 지움 | 덮어쓰면 "DB 수정"과 "캐시 수정" 순서가 어긋날 때 옛 값이 남을 수 있음. 지우면 다음 읽기가 반드시 DB에서 최신 값을 가져옴 | `test_price_update_invalidates_cache` |
+| DB 먼저 고치고, 그다음 캐시 삭제 | 캐시를 먼저 지우면, DB를 고치기 전에 다른 요청이 옛 값을 다시 캐시에 채울 수 있음 | `test_db_is_updated_before_cache_delete` |
+| 종목 하나가 바뀌어도 목록 키 전체를 지움 | 거래량 상위 목록을 키 하나에 통째로 저장하기 때문. 그 종목만 골라 고치는 것보다 단순하고, 다음 조회 한 번으로 다시 채워짐 | `test_price_update_invalidates_cache` |
+| 캐시 삭제가 실패해도 가격 수정은 성공으로 처리 | 원본(DB)이 맞는 게 우선. 응답의 `cache_invalidated: false`로 알리고, 남은 옛 값은 TTL이 지나면 사라짐 | `test_write_still_succeeds` |
+| **만료(TTL)** | | |
+| TTL 60초를 함께 줌 | 무효화를 깜빡해도 60초 뒤엔 사라지는 안전망. 시연 스크립트만 환경변수로 600초. 근거는 아래 「TTL 60초는 어떻게 정했나」 | `test_expired_cache_goes_back_to_db`, `test_ttl_heals_missed_invalidation` |
+| 세션에 별도 기능을 만들지 않음 | 세션도 키-값이라 거래량 상위 종목과 같은 set / get으로 끝남. 로그인 유지 시간이 그대로 TTL이 됨 (`DEMO_SESSION_TTL`, 기본 30분). 30분은 흔히 쓰는 로그인 유지 시간(30분~하루) 중 짧은 쪽 | `test_session_local_cache_logs_out_on_other_server`, `test_session_mini_redis_keeps_login` |
+| **장애 대비** | | |
+| mini-redis가 죽어도 DB로 응답 | 캐시는 성능 문제일 뿐 기능 문제가 아님. 통신 실패를 "캐시 미스"로 처리 (Cache-Aside라 가능) | `test_read_answers_from_db` |
+| mini-redis 호출 타임아웃 1초 (`cache.py`의 `TIMEOUT_SECONDS`) | mini-redis가 응답하지 않을 때 고객이 오래 기다리지 않고 바로 DB로 넘어가게 | `test_slow_mini_redis_times_out` |
+| **성능 비교** | | |
+| 캐시 미사용은 `?nocache=1`로 | 같은 코드 경로에서 캐시만 빼서, 다른 조건은 똑같이 유지 | `test_nocache_skips_cache` |
+| 첫 조회(미스)와 이후(히트)를 따로 측정 | 섞어서 평균을 내면 측정 횟수에 따라 숫자가 달라져 뜻이 없어짐 | 아래 「측정 결과」 |
+| 시간은 클라이언트(벤치마크)에서 잼 | 고객이 실제로 기다리는 시간이라서. 서버가 돌려주는 `elapsed_ms`에는 네트워크 왕복이 빠짐 | 아래 「측정 결과」 |
+| 응답 시간과 함께 DB 조회 횟수를 셈 | 캐시의 목적은 DB 보호. 배수는 가짜 DB 지연에 따라 달라지지만, 막은 건수는 그렇지 않음 | 아래 「측정 결과」 |
 
 ### 만료와 무효화는 어디서 일어나나
 
@@ -158,29 +160,7 @@ python -m unittest tests.test_demo -v      # 17개, 서버를 띄우지 않고 1
 
 서버를 띄우지 않고 Flask `test_client`로 요청을 보냅니다. mini-redis 쪽도 실제 `mini_redis/server.py`를 `test_client`로 부르므로, 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 그대로 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다.
 
-설계 결정마다 그것을 확인하는 테스트가 있습니다.
-
-| 설계 결정 | 확인하는 테스트 |
-| --- | --- |
-| **조회와 무효화** | |
-| Cache-Aside: 두 번째 조회는 캐시에서 | `test_second_read_comes_from_cache` |
-| 수정하면 덮어쓰지 않고 목록 키를 지움 | `test_price_update_invalidates_cache` |
-| DB를 먼저 고치고 그다음 캐시를 지움 | `test_db_is_updated_before_cache_delete` |
-| 캐시 삭제가 실패해도 수정은 성공, `cache_invalidated: false` | `test_write_still_succeeds` |
-| **서버 두 대** | |
-| 로컬 캐시는 B가 옛 가격, mini-redis는 B도 새 가격 | `test_local_cache_goes_stale`, `test_mini_redis_stays_consistent` |
-| 세션도 같은 set / get: 로컬 캐시는 401, mini-redis는 로그인 유지 | `test_session_local_cache_logs_out_on_other_server`, `test_session_mini_redis_keeps_login` |
-| **만료(TTL)** | |
-| TTL이 지나면 다시 DB로 | `test_expired_cache_goes_back_to_db` |
-| 무효화를 놓쳐도 TTL이 지나면 저절로 맞음 | `test_ttl_heals_missed_invalidation` |
-| 로컬 캐시도 같은 방식으로 만료 | `test_local_cache_expires_the_same_way` |
-| **장애 대비** | |
-| mini-redis가 꺼져도 DB로 응답 | `test_read_answers_from_db` |
-| 응답이 없으면 타임아웃 후 DB로 | `test_slow_mini_redis_times_out` |
-| **성능 비교** | |
-| `?nocache=1`은 캐시를 쓰지도 채우지도 않음 | `test_nocache_skips_cache` |
-| **잘못된 입력** | |
-| 가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400 | `test_bad_price`, `test_unknown_stock`, `test_session_input` |
+설계 결정별 테스트는 위 「설계 결정」 표의 "확인" 칸에 있습니다. 그 밖에 잘못된 입력(가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400)을 `test_bad_price`, `test_unknown_stock`, `test_session_input`이 확인합니다.
 
 테스트가 진짜로 결정을 지키는지도 확인했습니다. 코드를 일부러 망가뜨리면 해당 테스트가 실패합니다.
 
