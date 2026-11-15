@@ -273,6 +273,6 @@
 | 7단계 비교 보고서 | [`hnjee` 브랜치 docs/STEP7.md](https://github.com/team1-mini-lab/mini-redis/blob/hnjee/docs/STEP7.md) |
 | 이현지의 개인 결정 기록 | [`hnjee` 브랜치 docs/hnjee/DECISIONS.md](https://github.com/team1-mini-lab/mini-redis/blob/hnjee/docs/hnjee/DECISIONS.md) |
 | 김은기의 개인 결정 기록 | [`eungi` 브랜치 docs/eungi/DECISIONS.md](https://github.com/team1-mini-lab/mini-redis/blob/eungi/docs/eungi/DECISIONS.md) |
-| 김소망의 개인 결정 기록 | [`somang` 브랜치 docs/somang/DECISIONS.md](https://github.com/team1-mini-lab/mini-redis/blob/somang/docs/somang/DECISIONS.md) |
+| 김소망의 개인 결정 기록 | [커밋 36b80f2의 docs/somang/DECISIONS.md](https://github.com/team1-mini-lab/mini-redis/blob/36b80f2/docs/somang/DECISIONS.md) |
 | 회의록 | 공통 결정 회의, 1~3차 체크인, 8·9단계 공유 (GitHub Discussions) |
 | 데모의 결정과 TTL 근거 | [demo/README.md](../demo/README.md) |
