@@ -1,10 +1,12 @@
-import math
 from flask import Flask, request, jsonify
 from mini_redis.store import Store
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
 store = Store()
+
+ALLOWED_FIELDS = {"key", "value", "ttl"}
+MAX_TTL_SECONDS = 10 * 365 * 24 * 60 * 60   # 10년. 이보다 긴 만료는 실수일 가능성이 큼
 
 
 def _bad_request(message):
@@ -20,20 +22,26 @@ def _is_valid_ttl(ttl):
         return True
     if isinstance(ttl, bool) or not isinstance(ttl, (int, float)):
         return False
-    return math.isfinite(ttl) and ttl > 0
+    # math.isfinite()는 아주 큰 정수를 소수로 바꾸다 OverflowError(500)를 낸다.
+    # 범위 비교는 정수 그대로 되고, NaN·무한대도 이 비교에서 걸러진다.
+    return 0 < ttl <= MAX_TTL_SECONDS
 
 
 @app.post("/set")
 def set_value():
-    data = request.get_json(silent=True, force=True)
+    data = request.get_json(silent=True)   # Content-Type이 JSON이 아니면 None
     if not isinstance(data, dict):
         return _bad_request("body must be a JSON object")
+    unknown = set(data) - ALLOWED_FIELDS
+    if unknown:
+        # "ttI"처럼 오타 난 칸을 무시하면 만료 없이 영원히 저장된다.
+        return _bad_request(f"unknown fields: {', '.join(sorted(unknown))}")
     if not _is_valid_key(data.get("key")):
         return _bad_request("key must be a non-empty string")
     if data.get("value") is None:
         return _bad_request("value is required and cannot be null")
     if not _is_valid_ttl(data.get("ttl")):
-        return _bad_request("ttl must be a positive number of seconds")
+        return _bad_request("ttl must be a number of seconds, 0 < ttl <= 10 years")
     store.set(data["key"], data["value"], data.get("ttl"))
     return jsonify({"ok": True})
 

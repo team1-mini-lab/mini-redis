@@ -15,6 +15,7 @@
 | [STEP5.md](./STEP5.md) | 5단계: lock (`Store`가 `HashTable`을 lock 하나로 감쌈) | 완료 |
 | [STEP6.md](./STEP6.md) | 6단계: 입력 검증 (빈 키, null 값, 잘못된 `ttl`에 400) | 완료 |
 | [DECISIONS.md](./DECISIONS.md) | 개인 결정 기록 (확정 / 미결정) | 완료 |
+| [CROSS_CHECK_FIXES.md](./CROSS_CHECK_FIXES.md) | 교차 검증(같은 요청 23개)에서 찾은 빈틈과 고친 방법 | 완료 |
 
 팀 공유용 "왜 레디스인가" 설명은 [docs/study/WHY_REDIS.md](../study/WHY_REDIS.md)에 있습니다.
 
