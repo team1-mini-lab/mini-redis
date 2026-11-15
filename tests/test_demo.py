@@ -186,6 +186,7 @@ class CacheDownTest(DemoTestCase):
         accepted = []
         threading.Thread(target=lambda: accepted.append(listener.accept()), daemon=True).start()
         self.addCleanup(listener.close)
+        self.addCleanup(lambda: [conn.close() for conn, _ in accepted])
 
         slow = RedisCache(f"http://127.0.0.1:{listener.getsockname()[1]}")
         slow._already_warned = True
