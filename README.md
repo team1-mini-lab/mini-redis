@@ -59,7 +59,7 @@ git clone https://github.com/team1-mini-lab/mini-redis.git
 cd mini-redis
 ```
 
-첫 줄은 저장소를 내 컴퓨터에 `mini-redis` 폴더로 내려받고, 둘째 줄은 그 폴더로 들어갑니다. 이후의 명령은 모두 이 폴더 안에서 입력합니다.
+저장소를 내 컴퓨터에 `mini-redis` 폴더로 내려받고, 그 폴더로 들어갑니다. 이후의 명령은 모두 이 폴더 안에서 입력합니다.
 
 ### 2단계: 실행 준비 (처음 한 번만)
 
