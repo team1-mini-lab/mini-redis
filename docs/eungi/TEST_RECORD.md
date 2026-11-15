@@ -34,7 +34,7 @@ python docs/eungi/check_tests_catch_bugs.py     # 변이 검사 12가지
 
 | 왜 추가했나 | 테스트 | 확인하는 것 |
 |---|---|---|
-| 결정마다 짝을 맞춤 | `test_db_is_updated_before_cache_delete` | 캐시를 지우는 순간 DB는 이미 새 가격 (DB 먼저, 캐시 나중) |
+| 설계 결정마다 테스트 짝을 맞춤 | `test_db_is_updated_before_cache_delete` | 캐시를 지우는 순간 DB는 이미 새 가격 (DB 먼저, 캐시 나중) |
 | | `test_slow_mini_redis_times_out` | 연결만 받고 답하지 않는 mini-redis 앞에서 기다리지 않고 DB로 감, 기본 타임아웃 1초 |
 | | `test_local_cache_expires_the_same_way` | 로컬 캐시도 mini-redis처럼 TTL이 지나면 만료 |
 | | `test_session_expires_after_ttl` | 세션 TTL이 지나면 401 |
