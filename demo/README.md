@@ -182,3 +182,5 @@ python -m pytest tests/test_demo.py -v     # 14개, 서버를 띄우지 않고 1
 - 첫 조회는 캐시에 값이 없어 느린 것이 정상입니다. 캐시의 효과는 그 다음부터 나옵니다.
 
 > 숫자는 측정 환경마다 다릅니다. `python -m bench.benchmark --markdown`으로 다시 재서 바꿔 넣으세요.
+
+실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
