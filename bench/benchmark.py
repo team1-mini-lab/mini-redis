@@ -53,6 +53,12 @@ def check_demo_api():
         print("  python -m demo.app            (터미널 2)", file=sys.stderr)
         sys.exit(1)
     health = response.json()
+    if health.get("cache") != "redis":
+        # --cache local로 띄운 앱을 재면 mini-redis가 아니라 로컬 캐시를 잰 결과가 된다.
+        print("데모 API가 mini-redis가 아닌 캐시로 떠 있습니다. --cache 옵션 없이 다시 실행하세요:",
+              file=sys.stderr)
+        print("  python -m demo.app            (터미널 2)", file=sys.stderr)
+        sys.exit(1)
     if health.get("cache_status") != "up":
         # mini-redis가 꺼져 있으면 "캐시 사용"도 매번 DB로 가서 비교가 뜻이 없다.
         print("mini-redis에 연결할 수 없습니다. 먼저 실행하세요:", file=sys.stderr)

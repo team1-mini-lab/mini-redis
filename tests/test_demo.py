@@ -7,6 +7,7 @@
     4. 만료 — TTL이 지나면 다시 DB로 간다
     5. 잘못된 입력 — 400 / 404
     6. 무효화 순서 — DB를 먼저 고치고 그다음 캐시를 지운다
+    7. 실제 HTTP — RedisCache가 진짜 mini-redis 서버에 네트워크로 붙어도 같은 결과
 
 서버를 띄우지 않는다. Flask의 test_client로 요청을 보낸다.
 mini-redis 쪽도 실제 mini_redis/server.py 코드를 test_client로 부르므로,
@@ -23,6 +24,8 @@ import tempfile
 import threading
 import time
 import unittest
+
+from werkzeug.serving import make_server
 
 import demo.app as demo_app
 from demo import db
@@ -65,7 +68,8 @@ class DemoTestCase(unittest.TestCase):
     def setUp(self):
         # DB: 테스트마다 새 임시 파일, 지연 없음
         self._tmp = tempfile.TemporaryDirectory()
-        self._saved = (db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.TOP_STOCKS_TTL)
+        self._saved = (db.DB_PATH, db.QUERY_DELAY, demo_app.cache,
+                       demo_app.TOP_STOCKS_TTL, demo_app.SESSION_TTL)
         db.DB_PATH = os.path.join(self._tmp.name, "test.sqlite3")
         db.QUERY_DELAY = 0
         db.reset()
@@ -74,7 +78,8 @@ class DemoTestCase(unittest.TestCase):
         self.client = demo_app.app.test_client()
 
     def tearDown(self):
-        db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.TOP_STOCKS_TTL = self._saved
+        (db.DB_PATH, db.QUERY_DELAY, demo_app.cache,
+         demo_app.TOP_STOCKS_TTL, demo_app.SESSION_TTL) = self._saved
         self._tmp.cleanup()
 
     # ── 도우미 ────────────────────────────────────────────
@@ -188,6 +193,7 @@ class CacheDownTest(DemoTestCase):
         self.addCleanup(listener.close)
         self.addCleanup(lambda: [conn.close() for conn, _ in accepted])
 
+        self.assertEqual(RedisCache.TIMEOUT_SECONDS, 1.0)   # 문서에 적은 기본값
         slow = RedisCache(f"http://127.0.0.1:{listener.getsockname()[1]}")
         slow._already_warned = True
         slow.TIMEOUT_SECONDS = 0.2                    # 1초를 기다리지 않으려고 줄임
@@ -226,6 +232,63 @@ class ExpiryTest(DemoTestCase):
         self.assertEqual(self.top_stocks(cache)[0], "cache")
         time.sleep(0.1)
         self.assertEqual(self.top_stocks(cache)[0], "db")
+
+
+    def test_session_expires_after_ttl(self):
+        """로그인 유지 시간이 그대로 세션의 TTL이다."""
+        demo_app.SESSION_TTL = 0.05
+        cache = InProcessMiniRedis()
+        token = self.on(cache).post("/login", json={"user": "guest"}).get_json()["token"]
+        self.assertEqual(self.on(cache).get(f"/me?token={token}").status_code, 200)
+        time.sleep(0.1)
+        self.assertEqual(self.on(cache).get(f"/me?token={token}").status_code, 401)
+
+    def test_expired_key_delete_is_same_on_both_caches(self):
+        """만료된 키를 지우면 로컬 캐시도 mini-redis처럼 False (cache_invalidated가 같게 나오도록)."""
+        for cache in (LocalCache(), InProcessMiniRedis()):
+            with self.subTest(cache=cache.name):
+                cache.set("k", "v", ttl=0.05)
+                time.sleep(0.1)
+                self.assertFalse(cache.delete("k"))
+
+
+class RealHttpTest(DemoTestCase):
+    """RedisCache가 진짜 mini-redis 서버에 네트워크(HTTP)로 붙는 경로.
+
+    다른 테스트는 서버를 띄우지 않으려고 test_client를 쓰지만, 여기서는 mini-redis를
+    실제 포트에 띄우고 데모 API가 쓰는 RedisCache 그대로 요청을 보낸다.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.server = make_server("127.0.0.1", 0, mini_redis_server.app, threaded=True)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.shutdown)
+        url = f"http://127.0.0.1:{self.server.server_port}"
+        self.server_a, self.server_b = RedisCache(url), RedisCache(url)
+
+    def test_cache_aside_and_invalidation_over_http(self):
+        self.assertEqual(self.top_stocks(self.server_a), ("db", 50000))
+        self.assertEqual(self.top_stocks(self.server_b), ("cache", 50000))   # A가 채운 걸 B도 봄
+        res = self.set_price(self.server_a, 40000)
+        self.assertTrue(res.get_json()["cache_invalidated"])
+        self.assertEqual(self.top_stocks(self.server_b), ("db", 40000))      # 지워졌으니 새 값
+        self.assertEqual(self.top_stocks(self.server_b), ("cache", 40000))
+
+    def test_ttl_is_sent_over_http(self):
+        """TTL이 네트워크 요청에 실려 mini-redis까지 가야 만료가 일어난다."""
+        demo_app.TOP_STOCKS_TTL = 0.05
+        self.top_stocks(self.server_a)
+        self.assertEqual(self.top_stocks(self.server_a)[0], "cache")
+        time.sleep(0.1)
+        self.assertEqual(self.top_stocks(self.server_a)[0], "db")
+
+    def test_session_over_http(self):
+        token = self.on(self.server_a).post("/login", json={"user": "guest"}).get_json()["token"]
+        res = self.on(self.server_b).get(f"/me?token={token}")
+        self.assertEqual((res.status_code, res.get_json()["user"]), (200, "guest"))
+        self.on(self.server_b).post(f"/logout?token={token}")
+        self.assertEqual(self.on(self.server_a).get(f"/me?token={token}").status_code, 401)
 
 
 class InvalidationOrderTest(DemoTestCase):

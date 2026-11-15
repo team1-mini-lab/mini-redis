@@ -96,8 +96,10 @@ class LocalCache:
             self._entries[key] = (value, expire_at)
 
     def delete(self, key):
+        """mini-redis와 같게, 이미 만료된 키를 지우면 False."""
         with self._lock:
-            return self._entries.pop(key, None) is not None
+            entry = self._entries.pop(key, None)
+            return entry is not None and not _is_expired(entry[1])
 
     def ping(self):
         return True
