@@ -122,7 +122,7 @@ curl -X DELETE "localhost:8000/delete?key=name"
 
 키를 지웁니다. 지운 키가 있었으면 `{"deleted":true}`, 없었으면 `{"deleted":false}`가 돌아옵니다.
 
-### 5단계: 서버 여러 대 장면 재현하기
+### 5단계: 서버 여러 대인 장면 재현하기
 
 ```bash
 python -m demo.scenario
