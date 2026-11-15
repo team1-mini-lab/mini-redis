@@ -15,7 +15,7 @@ QUERY_DELAY = float(os.environ.get("DEMO_DB_DELAY", "3"))
 WRITE_LOCK_WAIT_SECONDS = 5
 
 # (id, 이름, 가격, 거래량)
-SEED_PRODUCTS = [
+SEED_STOCKS = [
     (1, "SW-AI", 50000, 320),
     (2, "게임 랩", 20000, 280),
     (3, "게임 테크 랩", 250000, 150),
@@ -28,8 +28,8 @@ def init():
     """이미 종목이 있으면 건드리지 않는다. 다른 서버가 고쳐 둔 가격을 덮어쓰지 않기 위해서다."""
     with closing(_connect()) as connection, connection:
         _create_tables_if_missing(connection)
-        if _has_no_products(connection):
-            _insert_seed_products(connection)
+        if _has_no_stocks(connection):
+            _insert_seed_stocks(connection)
         connection.execute("INSERT OR IGNORE INTO stats VALUES ('query_count', 0)")
 
 
@@ -37,43 +37,43 @@ def reset():
     """종목과 조회 횟수를 처음 상태로 돌린다."""
     init()
     with closing(_connect()) as connection, connection:
-        connection.execute("DELETE FROM products")
-        _insert_seed_products(connection)
+        connection.execute("DELETE FROM stocks")
+        _insert_seed_stocks(connection)
         _set_query_count_to_zero(connection)
 
 
-def get_popular_products(limit=3):
+def get_top_stocks(limit=3):
     """거래량 순 상위 종목. 무거운 집계 조회를 흉내 내려고 QUERY_DELAY초 걸린다."""
     time.sleep(QUERY_DELAY)
     with closing(_connect()) as connection, connection:
         _increase_query_count(connection)
         rows = connection.execute(
-            "SELECT id, name, price, sales FROM products ORDER BY sales DESC LIMIT ?",
+            "SELECT id, name, price, volume FROM stocks ORDER BY volume DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def get_product(product_id):
+def get_stock(stock_id):
     """없는 종목이면 None."""
     with closing(_connect()) as connection:
         row = connection.execute(
-            "SELECT id, name, price, sales FROM products WHERE id = ?", (product_id,)
+            "SELECT id, name, price, volume FROM stocks WHERE id = ?", (stock_id,)
         ).fetchone()
     return dict(row) if row else None
 
 
-def update_price(product_id, price):
+def update_price(stock_id, price):
     """고쳤으면 True, 없는 종목이면 False."""
     with closing(_connect()) as connection, connection:
         cursor = connection.execute(
-            "UPDATE products SET price = ? WHERE id = ?", (price, product_id)
+            "UPDATE stocks SET price = ? WHERE id = ?", (price, stock_id)
         )
         return cursor.rowcount == 1
 
 
 def query_count():
-    """get_popular_products가 불린 횟수. 같은 원본을 보는 모든 서버의 합계다."""
+    """get_top_stocks가 불린 횟수. 같은 원본을 보는 모든 서버의 합계다."""
     with closing(_connect()) as connection:
         return connection.execute(
             "SELECT value FROM stats WHERE name = 'query_count'"
@@ -93,20 +93,20 @@ def _connect():
 
 def _create_tables_if_missing(connection):
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS products "
-        "(id INTEGER PRIMARY KEY, name TEXT, price INTEGER, sales INTEGER)"
+        "CREATE TABLE IF NOT EXISTS stocks "
+        "(id INTEGER PRIMARY KEY, name TEXT, price INTEGER, volume INTEGER)"
     )
     connection.execute(
         "CREATE TABLE IF NOT EXISTS stats (name TEXT PRIMARY KEY, value INTEGER)"
     )
 
 
-def _has_no_products(connection):
-    return connection.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0
+def _has_no_stocks(connection):
+    return connection.execute("SELECT COUNT(*) FROM stocks").fetchone()[0] == 0
 
 
-def _insert_seed_products(connection):
-    connection.executemany("INSERT INTO products VALUES (?, ?, ?, ?)", SEED_PRODUCTS)
+def _insert_seed_stocks(connection):
+    connection.executemany("INSERT INTO stocks VALUES (?, ?, ?, ?)", SEED_STOCKS)
 
 
 def _increase_query_count(connection):

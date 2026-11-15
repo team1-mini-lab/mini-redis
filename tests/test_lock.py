@@ -40,10 +40,10 @@ class LockTest(unittest.TestCase):
         """
         now = [1000]
         store = Store(clock=lambda: now[0])
-        store.set("popular", "종목목록", ttl=10)      # 만료 시점 1010
+        store.set("top_stocks", "종목목록", ttl=10)      # 만료 시점 1010
         now[0] = 1010
 
-        other = threading.Thread(target=lambda: store.set("popular", "새목록"))
+        other = threading.Thread(target=lambda: store.set("top_stocks", "새목록"))
         state = {}
 
         def clock_during_get():
@@ -54,12 +54,12 @@ class LockTest(unittest.TestCase):
             return now[0]
 
         store._clock = clock_during_get
-        self.assertIsNone(store.get("popular"))        # 만료된 옛 값은 지워지고 None
+        self.assertIsNone(store.get("top_stocks"))        # 만료된 옛 값은 지워지고 None
         other.join()
         store._clock = lambda: now[0]
 
         self.assertTrue(state["set_was_blocked"])      # set은 get이 끝날 때까지 기다렸다
-        self.assertEqual(store.get("popular"), "새목록")  # 새 값은 지워지지 않고 남아 있다
+        self.assertEqual(store.get("top_stocks"), "새목록")  # 새 값은 지워지지 않고 남아 있다
 
 
 if __name__ == "__main__":

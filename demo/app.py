@@ -25,9 +25,9 @@ HOST = "127.0.0.1"
 PORT = int(os.environ.get("DEMO_PORT", "8001"))
 cache = make_cache(os.environ.get("DEMO_CACHE", "redis"))
 
-POPULAR_KEY = "popular_products"
-POPULAR_LIMIT = 3
-POPULAR_TTL = float(os.environ.get("DEMO_CACHE_TTL", "60"))
+TOP_STOCKS_KEY = "top_stocks"
+TOP_STOCKS_LIMIT = 3
+TOP_STOCKS_TTL = float(os.environ.get("DEMO_CACHE_TTL", "60"))
 SESSION_TTL = float(os.environ.get("DEMO_SESSION_TTL", "1800"))
 SESSION_TOKEN_LENGTH = 8
 
@@ -42,44 +42,44 @@ def health():
     })
 
 
-@app.get("/products/popular")
-def popular_products():
+@app.get("/stocks/top")
+def top_stocks():
     started = time.perf_counter()
     if cache_is_bypassed():
-        products, source = db.get_popular_products(POPULAR_LIMIT), "db (nocache)"
+        stocks, source = db.get_top_stocks(TOP_STOCKS_LIMIT), "db (nocache)"
     else:
-        products, source = read_popular_products_through_cache()
+        stocks, source = read_top_stocks_through_cache()
     return jsonify({
         "server": server_name(),
         "source": source,
         "elapsed_ms": elapsed_ms_since(started),
-        "products": products,
+        "stocks": stocks,
     })
 
 
-@app.put("/products/<int:product_id>/price")
-def update_price(product_id):
+@app.put("/stocks/<int:stock_id>/price")
+def update_price(stock_id):
     body = request.get_json(silent=True)
     error = find_price_error(body)
     if error:
         return bad_request(error)
-    if not db.update_price(product_id, body["price"]):
+    if not db.update_price(stock_id, body["price"]):
         return not_found("없는 종목입니다")
-    cache_invalidated = invalidate_popular_products()
+    cache_invalidated = invalidate_top_stocks()
     return jsonify({
         "server": server_name(),
         "ok": True,
-        "product": db.get_product(product_id),
+        "stock": db.get_stock(stock_id),
         "cache_invalidated": cache_invalidated,
     })
 
 
-@app.get("/products/<int:product_id>")
-def get_product(product_id):
-    product = db.get_product(product_id)
-    if product is None:
+@app.get("/stocks/<int:stock_id>")
+def get_stock(stock_id):
+    stock = db.get_stock(stock_id)
+    if stock is None:
         return not_found("없는 종목입니다")
-    return jsonify(product)
+    return jsonify(stock)
 
 
 @app.post("/login")
@@ -126,7 +126,7 @@ def reset_stats():
 
 @app.delete("/cache")
 def clear_cache():
-    return jsonify({"deleted": invalidate_popular_products()})
+    return jsonify({"deleted": invalidate_top_stocks()})
 
 
 @app.errorhandler(404)
@@ -139,19 +139,19 @@ def method_not_allowed(error):
     return jsonify({"error": "허용하지 않는 메서드입니다"}), 405
 
 
-def read_popular_products_through_cache():
+def read_top_stocks_through_cache():
     """(종목 목록, 가져온 곳)을 돌려준다. 가져온 곳은 "cache" 또는 "db"."""
-    cached = cache.get(POPULAR_KEY)
+    cached = cache.get(TOP_STOCKS_KEY)
     if cached is not None:
         return cached, "cache"
-    products = db.get_popular_products(POPULAR_LIMIT)
+    stocks = db.get_top_stocks(TOP_STOCKS_LIMIT)
     # 무효화를 놓쳐도 TTL이 지나면 낡은 값이 사라진다.
-    cache.set(POPULAR_KEY, products, ttl=POPULAR_TTL)
-    return products, "db"
+    cache.set(TOP_STOCKS_KEY, stocks, ttl=TOP_STOCKS_TTL)
+    return stocks, "db"
 
 
-def invalidate_popular_products():
-    return cache.delete(POPULAR_KEY)
+def invalidate_top_stocks():
+    return cache.delete(TOP_STOCKS_KEY)
 
 
 def cache_is_bypassed():

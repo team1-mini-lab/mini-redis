@@ -238,20 +238,20 @@ function milliseconds(elapsedMs) {
   return `${Math.round(elapsedMs).toLocaleString("ko-KR")}ms`;
 }
 
-// 데모 API 호출. 데모 API의 주소와 응답 칸 이름은 products, sales이므로 여기서 stock, volume으로 바꿔 준다.
+// 데모 API 호출.
 // 나중에 미니 DBMS를 붙일 때는 이 묶음만 바꾸면 된다.
 
 const api = {
   ranking: async (useCache) => {
-    const answer = await call("GET", `/products/popular${useCache ? "" : "?nocache=1"}`);
+    const answer = await call("GET", `/stocks/top${useCache ? "" : "?nocache=1"}`);
     return {
       server: answer.server,
       source: answer.source,
       elapsedMs: answer.elapsed_ms,
-      stocks: answer.products.map(stockFromProduct),
+      stocks: answer.stocks,
     };
   },
-  changePrice: (stockId, price) => call("PUT", `/products/${stockId}/price`, { price }),
+  changePrice: (stockId, price) => call("PUT", `/stocks/${stockId}/price`, { price }),
   logIn: (user) => call("POST", "/login", { user }),
   logOut: (token) => call("POST", `/logout?token=${encodeURIComponent(token)}`),
   me: (token) => call("GET", `/me?token=${encodeURIComponent(token)}`),
@@ -259,10 +259,6 @@ const api = {
   resetDbQueryCount: () => call("POST", "/stats/reset"),
   clearCache: () => call("DELETE", "/cache"),
 };
-
-function stockFromProduct(product) {
-  return { id: product.id, name: product.name, price: product.price, volume: product.sales };
-}
 
 async function call(method, path, body) {
   const response = await fetch(`/api${path}`, {

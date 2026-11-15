@@ -126,12 +126,12 @@ class ScenarioPart:
 
     def server_a_reads_with_empty_cache(self):
         self.begin_step("① 서버 A로 거래량 상위 종목 조회 (캐시가 비어 있음)")
-        self.show_popular_products(self.port_a, "A")
+        self.show_top_stocks(self.port_a, "A")
         note(f"→ 캐시가 비어 있어 DB에서 50,000원을 가져오고, {self.cache_of_server_a}에 저장")
 
     def server_b_reads_the_same_data(self):
         self.begin_step("② 이번엔 같은 요청이 서버 B로 감 (로드밸런서가 번갈아 보냄)")
-        source, _ = self.show_popular_products(self.port_b, "B")
+        source, _ = self.show_top_stocks(self.port_b, "B")
         self.result["b_first"] = source
         self.result["fill_queries"] = db_query_count(self.port_a)
         if self.uses_local_cache:
@@ -155,8 +155,8 @@ class ScenarioPart:
 
     def customer_refreshes_on_both_servers(self):
         self.begin_step("④ 고객이 새로고침 — A로 한 번, B로 한 번")
-        self.show_popular_products(self.port_a, "A")
-        _, price_on_b = self.show_popular_products(self.port_b, "B")
+        self.show_top_stocks(self.port_a, "A")
+        _, price_on_b = self.show_top_stocks(self.port_b, "B")
         self.result["b_price"] = price_on_b
         if self.uses_local_cache:
             note("→ A: 캐시가 지워졌으니 DB에서 40,000원을 가져와 A 캐시에 저장")
@@ -169,7 +169,7 @@ class ScenarioPart:
         self.begin_step("⑤ 배포: 서버 A를 재시작하고 조회")
         self.servers.stop_demo_api(self.port_a)
         self.servers.start_demo_api(self.port_a, self.mode)
-        source, _ = self.show_popular_products(self.port_a, "A")
+        source, _ = self.show_top_stocks(self.port_a, "A")
         self.result["after_restart"] = source
         if self.uses_local_cache:
             note("→ 서버 A 프로그램이 꺼지면서 A 메모리의 캐시도 사라짐 → 다시 DB로")
@@ -208,10 +208,10 @@ class ScenarioPart:
         if self.wait_for_enter:
             input("    (Enter를 누르면 진행) ")
 
-    def show_popular_products(self, port, server_label):
+    def show_top_stocks(self, port, server_label):
         """(가져온 곳, SW-AI 가격)을 돌려준다."""
-        data = requests.get(f"{HOST}:{port}/products/popular", timeout=30).json()
-        price = keyboard_price(data["products"])
+        data = requests.get(f"{HOST}:{port}/stocks/top", timeout=30).json()
+        price = keyboard_price(data["stocks"])
         came_from = "캐시에서" if data["source"] == "cache" else "DB에서  "
         stale_mark = "   ← 옛 가격!" if self.price_has_changed and price == OLD_PRICE else ""
         print(f"    서버 {server_label}({port})가 응답 · {came_from} {data['elapsed_ms']:>7.1f}ms"
@@ -234,13 +234,13 @@ def note(text):
     print(f"    {text}")
 
 
-def keyboard_price(products):
-    return next(product["price"] for product in products if product["id"] == KEYBOARD_ID)
+def keyboard_price(stocks):
+    return next(stock["price"] for stock in stocks if stock["id"] == KEYBOARD_ID)
 
 
 def request_price_change(port, price):
     return requests.put(
-        f"{HOST}:{port}/products/{KEYBOARD_ID}/price", json={"price": price}, timeout=10
+        f"{HOST}:{port}/stocks/{KEYBOARD_ID}/price", json={"price": price}, timeout=10
     ).json()
 
 

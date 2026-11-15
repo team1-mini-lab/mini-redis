@@ -62,7 +62,7 @@ class DemoTestCase(unittest.TestCase):
     def setUp(self):
         # DB: 테스트마다 새 임시 파일, 지연 없음
         self._tmp = tempfile.TemporaryDirectory()
-        self._saved = (db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.POPULAR_TTL)
+        self._saved = (db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.TOP_STOCKS_TTL)
         db.DB_PATH = os.path.join(self._tmp.name, "test.sqlite3")
         db.QUERY_DELAY = 0
         db.reset()
@@ -71,7 +71,7 @@ class DemoTestCase(unittest.TestCase):
         self.client = demo_app.app.test_client()
 
     def tearDown(self):
-        db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.POPULAR_TTL = self._saved
+        db.DB_PATH, db.QUERY_DELAY, demo_app.cache, demo_app.TOP_STOCKS_TTL = self._saved
         self._tmp.cleanup()
 
     # ── 도우미 ────────────────────────────────────────────
@@ -81,15 +81,15 @@ class DemoTestCase(unittest.TestCase):
         demo_app.cache = cache
         return self.client
 
-    def popular(self, cache):
-        res = self.on(cache).get("/products/popular")
+    def top_stocks(self, cache):
+        res = self.on(cache).get("/stocks/top")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
-        keyboard = next(p for p in data["products"] if p["id"] == 1)
+        keyboard = next(p for p in data["stocks"] if p["id"] == 1)
         return data["source"], keyboard["price"]
 
     def set_price(self, cache, price):
-        return self.on(cache).put("/products/1/price", json={"price": price})
+        return self.on(cache).put("/stocks/1/price", json={"price": price})
 
 
 class CompletionCriteriaTest(DemoTestCase):
@@ -97,28 +97,28 @@ class CompletionCriteriaTest(DemoTestCase):
 
     def test_second_read_comes_from_cache(self):
         cache = InProcessMiniRedis()
-        self.assertEqual(self.popular(cache), ("db", 50000))
-        self.assertEqual(self.popular(cache), ("cache", 50000))
+        self.assertEqual(self.top_stocks(cache), ("db", 50000))
+        self.assertEqual(self.top_stocks(cache), ("cache", 50000))
         self.assertEqual(db.query_count(), 1)      # DB에는 한 번만 갔다
 
     def test_price_update_invalidates_cache(self):
         cache = InProcessMiniRedis()
-        self.popular(cache)                         # 캐시를 채운다
+        self.top_stocks(cache)                         # 캐시를 채운다
 
         res = self.set_price(cache, 40000)
         self.assertEqual(res.status_code, 200)
         self.assertTrue(res.get_json()["cache_invalidated"])
 
-        self.assertEqual(self.popular(cache), ("db", 40000))      # 지워졌으니 DB에서 새 값
-        self.assertEqual(self.popular(cache), ("cache", 40000))   # 다시 캐시에
+        self.assertEqual(self.top_stocks(cache), ("db", 40000))      # 지워졌으니 DB에서 새 값
+        self.assertEqual(self.top_stocks(cache), ("cache", 40000))   # 다시 캐시에
 
     def test_nocache_skips_cache(self):
         cache = InProcessMiniRedis()
         for _ in range(2):
-            res = self.on(cache).get("/products/popular?nocache=1")
+            res = self.on(cache).get("/stocks/top?nocache=1")
             self.assertEqual(res.get_json()["source"], "db (nocache)")
         self.assertEqual(db.query_count(), 2)
-        self.assertIsNone(cache.get(demo_app.POPULAR_KEY))   # 캐시도 채우지 않는다
+        self.assertIsNone(cache.get(demo_app.TOP_STOCKS_KEY))   # 캐시도 채우지 않는다
 
 
 class TwoServersTest(DemoTestCase):
@@ -126,10 +126,10 @@ class TwoServersTest(DemoTestCase):
 
     def run_scene(self, cache_a, cache_b):
         """A 조회 → B 조회 → A에서 시세 변경 → B 조회. (B의 첫 조회 출처, 시세 변경 후 B가 본 가격)"""
-        self.popular(cache_a)
-        b_first, _ = self.popular(cache_b)
+        self.top_stocks(cache_a)
+        b_first, _ = self.top_stocks(cache_b)
         self.set_price(cache_a, 40000)
-        _, b_price = self.popular(cache_b)
+        _, b_price = self.top_stocks(cache_b)
         return b_first, b_price
 
     def test_local_cache_goes_stale(self):
@@ -166,36 +166,36 @@ class CacheDownTest(DemoTestCase):
         self.dead._warned = True                        # 경고 출력 끄기
 
     def test_read_answers_from_db(self):
-        self.assertEqual(self.popular(self.dead), ("db", 50000))
-        self.assertEqual(self.popular(self.dead), ("db", 50000))   # 느려질 뿐 답은 맞다
+        self.assertEqual(self.top_stocks(self.dead), ("db", 50000))
+        self.assertEqual(self.top_stocks(self.dead), ("db", 50000))   # 느려질 뿐 답은 맞다
 
     def test_write_still_succeeds(self):
         res = self.set_price(self.dead, 40000)
         self.assertEqual(res.status_code, 200)
         self.assertFalse(res.get_json()["cache_invalidated"])   # 지우지 못했다고 알려 준다
-        self.assertEqual(db.get_product(1)["price"], 40000)     # DB는 고쳐졌다
+        self.assertEqual(db.get_stock(1)["price"], 40000)     # DB는 고쳐졌다
 
 
 class ExpiryTest(DemoTestCase):
     """TTL이 지나면 캐시가 사라지고 다시 DB로 간다 (무효화를 놓쳤을 때의 안전망)."""
 
     def test_expired_cache_goes_back_to_db(self):
-        demo_app.POPULAR_TTL = 0.05
+        demo_app.TOP_STOCKS_TTL = 0.05
         cache = InProcessMiniRedis()
-        self.popular(cache)
-        self.assertEqual(self.popular(cache)[0], "cache")
+        self.top_stocks(cache)
+        self.assertEqual(self.top_stocks(cache)[0], "cache")
         time.sleep(0.1)
-        self.assertEqual(self.popular(cache)[0], "db")
+        self.assertEqual(self.top_stocks(cache)[0], "db")
 
     def test_ttl_heals_missed_invalidation(self):
         """DB를 앱 밖에서 직접 고치면(무효화 실패) TTL 동안만 옛 값이 보인다."""
-        demo_app.POPULAR_TTL = 0.05
+        demo_app.TOP_STOCKS_TTL = 0.05
         cache = InProcessMiniRedis()
-        self.popular(cache)
+        self.top_stocks(cache)
         db.update_price(1, 40000)                   # 앱을 거치지 않음 → 캐시를 아무도 안 지움
-        self.assertEqual(self.popular(cache), ("cache", 50000))   # 아직 옛 값
+        self.assertEqual(self.top_stocks(cache), ("cache", 50000))   # 아직 옛 값
         time.sleep(0.1)
-        self.assertEqual(self.popular(cache), ("db", 40000))      # TTL이 지나 저절로 맞음
+        self.assertEqual(self.top_stocks(cache), ("db", 40000))      # TTL이 지나 저절로 맞음
 
 
 class ValidationTest(DemoTestCase):
@@ -205,16 +205,16 @@ class ValidationTest(DemoTestCase):
         cache = InProcessMiniRedis()
         for body in ({}, {"price": -1}, {"price": "40000"}, {"price": True}, {"price": 1.5}):
             with self.subTest(body=body):
-                res = self.on(cache).put("/products/1/price", json=body)
+                res = self.on(cache).put("/stocks/1/price", json=body)
                 self.assertEqual(res.status_code, 400)
-        self.assertEqual(db.get_product(1)["price"], 50000)    # 아무것도 바뀌지 않았다
+        self.assertEqual(db.get_stock(1)["price"], 50000)    # 아무것도 바뀌지 않았다
 
-    def test_unknown_product(self):
+    def test_unknown_stock(self):
         res = self.set_price(InProcessMiniRedis(), 40000)
         self.assertEqual(res.status_code, 200)
-        res = self.on(InProcessMiniRedis()).put("/products/999/price", json={"price": 1})
+        res = self.on(InProcessMiniRedis()).put("/stocks/999/price", json={"price": 1})
         self.assertEqual(res.status_code, 404)
-        res = self.on(InProcessMiniRedis()).get("/products/999")
+        res = self.on(InProcessMiniRedis()).get("/stocks/999")
         self.assertEqual(res.status_code, 404)
 
     def test_session_input(self):

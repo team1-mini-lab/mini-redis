@@ -53,10 +53,10 @@ python -m demo.app --port 8102 --cache local
 
 | 메서드 | 주소 | 하는 일 |
 |---|---|---|
-| GET | `/products/popular` | 거래량 상위 종목 조회 (Cache-Aside). 응답의 `source`가 `cache`/`db` |
-| GET | `/products/popular?nocache=1` | 캐시를 건너뛰고 DB로 (9단계 비교용) |
-| PUT | `/products/<id>/price` | 가격 수정 → DB 수정 후 캐시 삭제 (무효화) |
-| GET | `/products/<id>` | 종목 하나 (가격 확인용, 캐시 안 씀) |
+| GET | `/stocks/top` | 거래량 상위 종목 조회 (Cache-Aside). 응답의 `source`가 `cache`/`db` |
+| GET | `/stocks/top?nocache=1` | 캐시를 건너뛰고 DB로 (9단계 비교용) |
+| PUT | `/stocks/<id>/price` | 가격 수정 → DB 수정 후 캐시 삭제 (무효화) |
+| GET | `/stocks/<id>` | 종목 하나 (가격 확인용, 캐시 안 씀) |
 | POST | `/login` | 로그인 → 세션을 캐시에 저장하고 토큰 반환 (본문 `{"user":"..."}`) |
 | GET | `/me?token=` | 세션 조회. 없거나 만료되면 401 (장면 ② 시연용) |
 | POST | `/logout?token=` | 세션 키 삭제 |
@@ -67,15 +67,15 @@ python -m demo.app --port 8102 --cache local
 ## 시연 순서 (장면 ① 가격이 왔다 갔다를 무효화로 해결)
 
 ```bash
-curl localhost:8001/products/popular        # source=db,    약 3000ms, SW-AI 50000원
-curl localhost:8001/products/popular        # source=cache, 약 2ms,    SW-AI 50000원
+curl localhost:8001/stocks/top        # source=db,    약 3000ms, SW-AI 50000원
+curl localhost:8001/stocks/top        # source=cache, 약 2ms,    SW-AI 50000원
 
-curl -X PUT localhost:8001/products/1/price \
+curl -X PUT localhost:8001/stocks/1/price \
      -H "Content-Type: application/json" -d '{"price":40000}'
                                             # cache_invalidated=true
 
-curl localhost:8001/products/popular        # source=db,    약 3000ms, SW-AI 40000원
-curl localhost:8001/products/popular        # source=cache, 약 2ms,    SW-AI 40000원
+curl localhost:8001/stocks/top        # source=db,    약 3000ms, SW-AI 40000원
+curl localhost:8001/stocks/top        # source=cache, 약 2ms,    SW-AI 40000원
 ```
 
 ## 시연 순서 (장면 ② 로그인이 풀림을 공용 저장소로 해결)
@@ -126,7 +126,7 @@ TTL은 무효화의 대체가 아니라 **안전망**입니다. 무효화가 제
 "1분당 DB 조회"는 같은 키를 계속 조회할 때의 값입니다. 캐시 미스는 TTL마다 한 번씩 나므로 `60초 ÷ TTL`입니다.
 
 - **TTL을 짧게 해도 장면 ①(가격이 왔다 갔다)은 풀리지 않습니다.** 그 시간 동안은 여전히 틀린 값이고, 노출 시간만 줄어듭니다. 근본 해결은 쓰기 때 지우는 것입니다.
-- **시연·테스트용 값은 코드 기본값을 바꾸지 않고 환경변수로 줍니다.** 기본값을 바꾸면 운영 설정이 시연 편의에 끌려갑니다. `demo/app.py`의 `POPULAR_TTL`은 `DEMO_CACHE_TTL`이 없으면 60초 그대로입니다.
+- **시연·테스트용 값은 코드 기본값을 바꾸지 않고 환경변수로 줍니다.** 기본값을 바꾸면 운영 설정이 시연 편의에 끌려갑니다. `demo/app.py`의 `TOP_STOCKS_TTL`은 `DEMO_CACHE_TTL`이 없으면 60초 그대로입니다.
 - 기본 60초, 시연 스크립트만 600초로 팀이 정했습니다 ([docs/DECISIONS.md](../docs/DECISIONS.md) 6장).
 
 > 만료(TTL)는 **저장소**가 시간이 되면 알아서 지우는 것이고, 무효화는 값이 바뀐 걸 아는 **앱**이 바로 지우는 것입니다. 둘을 헷갈리면 "가격이 틀리게 보인다"는 문제를 TTL 숫자를 줄여서 풀려고 하게 되는데, 그러면 틀린 시간이 짧아질 뿐 없어지지 않고 DB 조회만 늘어납니다. 가격이 바뀌는 순간 지우는 것(무효화)이 진짜 해결입니다.

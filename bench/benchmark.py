@@ -71,7 +71,7 @@ def measure_without_cache(request_count):
     print("[1/2] 캐시 미사용", end="", flush=True)
     elapsed_times = []
     for _ in range(request_count):
-        elapsed_ms, _ = request_popular_products(use_cache=False)
+        elapsed_ms, _ = request_top_stocks(use_cache=False)
         elapsed_times.append(elapsed_ms)
         print_progress(".")
     db_queries = db_query_count()
@@ -83,11 +83,11 @@ def measure_with_cache(request_count):
     """(첫 조회 시간, 이후 조회 시간 목록, DB 조회 횟수)"""
     clear_cache_and_db_query_count()
     print("[2/2] 캐시 사용  ", end="", flush=True)
-    miss_time, first_source = request_popular_products(use_cache=True)
+    miss_time, first_source = request_top_stocks(use_cache=True)
     print_progress("M")
     hit_times = []
     for _ in range(request_count - 1):
-        elapsed_ms, source = request_popular_products(use_cache=True)
+        elapsed_ms, source = request_top_stocks(use_cache=True)
         hit_times.append(elapsed_ms)
         print_progress("." if source == "cache" else "M")
     db_queries = db_query_count()
@@ -96,11 +96,11 @@ def measure_with_cache(request_count):
     return miss_time, hit_times, db_queries
 
 
-def request_popular_products(use_cache):
+def request_top_stocks(use_cache):
     """(응답 시간 ms, 가져온 곳). 고객이 기다리는 시간을 재려고 클라이언트 쪽에서 잰다."""
     params = None if use_cache else {"nocache": "1"}
     started = time.perf_counter()
-    response = requests.get(f"{DEMO_URL}/products/popular", params=params, timeout=TIMEOUT_SECONDS)
+    response = requests.get(f"{DEMO_URL}/stocks/top", params=params, timeout=TIMEOUT_SECONDS)
     elapsed_ms = (time.perf_counter() - started) * 1000
     response.raise_for_status()
     return elapsed_ms, response.json()["source"]
