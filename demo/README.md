@@ -99,6 +99,8 @@ curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 �
 
 ## 데모 API와 성능 비교의 설계 결정
 
+결정마다 그 결정이 지켜지는지 확인하는 테스트나 시연을 짝지어 두었습니다.
+
 | | 결정 | 이유 | 확인 |
 |---|---|---|---|
 | 구조 | mini-redis를 HTTP로 호출 | 과제의 "외부에서 사용". import하면 같은 프로세스라 공용 저장소를 보여 줄 수 없음 | `test_cache_aside_and_invalidation_over_http`, `test_session_over_http` (실제 포트에 띄운 mini-redis에 HTTP로 요청) |
