@@ -50,32 +50,99 @@ https://mini-stock-tu7t.onrender.com
 
 ## 3. 직접 실행
 
-코드를 받아서 내 컴퓨터에서 직접 돌려 보거나 테스트를 실행하려면, 먼저 한 번 아래처럼 준비합니다.
+코드를 받아 내 컴퓨터에서 직접 돌려 보는 방법입니다. Python 3(3.13에서 확인)과 Git이 설치되어 있어야 합니다. 아래 명령은 모두 터미널에 입력합니다. Windows에서는 PowerShell을 쓰되, `curl`이 나오는 4단계만 Git Bash에서 실행하는 것이 편합니다.
+
+### 1단계: 코드 받기
+
+```bash
+git clone https://github.com/team1-mini-lab/mini-redis.git
+cd mini-redis
+```
+
+첫 줄은 저장소를 내 컴퓨터에 `mini-redis` 폴더로 내려받고, 둘째 줄은 그 폴더로 들어갑니다. 이후의 명령은 모두 이 폴더 안에서 입력합니다.
+
+### 2단계: 실행 준비 (처음 한 번만)
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+```
+
+이 프로젝트에서만 쓰는 파이썬 환경을 `.venv` 폴더에 만듭니다. 다른 프로젝트에 설치한 패키지와 섞이지 않게 하기 위해서입니다.
+
+```bash
+source .venv/bin/activate        # macOS, Linux
+.venv\Scripts\activate           # Windows
+```
+
+방금 만든 환경을 켭니다. 켜지면 터미널 줄 앞에 `(.venv)`가 붙습니다. 터미널을 새로 열 때마다 이 명령을 다시 입력해야 합니다.
+
+```bash
 pip install -r requirements.txt
 ```
 
-| 하고 싶은 것 | 명령 |
-| --- | --- |
-| mini-redis 서버 띄우기 (포트 8000) | `python -m mini_redis.server` |
-| 서버 두 대 시연 (로컬 캐시 vs mini-redis, 약 20초) | `python -m demo.scenario` |
-| 시연을 한 단계씩 (발표용) | `python -m demo.scenario --step` |
-| 성능 비교 (mini-redis, 데모 API를 먼저 띄운 뒤) | `python -m demo.app` → `python -m bench.benchmark` |
-| 주식 화면 (데모 API를 먼저 띄운 뒤, 포트 8010) | `python -m stock.server` |
-| 세 서버를 한 번에 (배포와 같은 방식) | `python -m deploy.start` |
-| 전체 테스트 | `python -m unittest -v` |
+필요한 패키지 두 개(HTTP 서버를 만드는 Flask, 서버끼리 요청을 주고받는 requests)를 설치합니다.
 
-직접 요청을 보내 보려면 (mini-redis를 띄운 상태에서):
+### 3단계: 미니 증권 화면을 내 컴퓨터에서 띄우기
+
+```bash
+python -m deploy.start
+```
+
+mini-redis(포트 8000), 데모 API(포트 8001), 미니 증권 화면(포트 8010) 세 서버를 차례로 띄웁니다. 배포된 사이트와 같은 방식입니다. 세 서버가 모두 뜨면 브라우저에서 `http://localhost:8010`을 열어 2장에서 설명한 화면을 그대로 써 볼 수 있습니다. 끝낼 때는 터미널에서 `Ctrl + C`를 누르면 세 서버가 함께 꺼집니다.
+
+### 4단계: mini-redis에 직접 요청 보내 보기
+
+```bash
+python -m mini_redis.server
+```
+
+mini-redis 서버만 포트 8000에 띄웁니다. 이 터미널은 서버가 쓰고 있으니 그대로 두고, 터미널을 하나 더 열어 아래 명령을 차례로 입력합니다.
 
 ```bash
 curl -X POST localhost:8000/set -H "Content-Type: application/json" -d '{"key":"name","value":"mini","ttl":5}'
-curl "localhost:8000/get?key=name"        # 200 {"key":"name","value":"mini"}
-# 5초 뒤
-curl "localhost:8000/get?key=name"        # 404 {"error":"not found"}
 ```
+
+키 `name`에 값 `mini`를 5초 동안 저장합니다. `{"ok":true}`가 돌아오면 저장된 것입니다.
+
+```bash
+curl "localhost:8000/get?key=name"
+```
+
+저장한 값을 꺼냅니다. `{"key":"name","value":"mini"}`가 돌아옵니다. 5초가 지난 뒤 같은 명령을 다시 입력하면 만료되어 `{"error":"not found"}`가 돌아옵니다.
+
+```bash
+curl -X DELETE "localhost:8000/delete?key=name"
+```
+
+키를 지웁니다. 지운 키가 있었으면 `{"deleted":true}`, 없었으면 `{"deleted":false}`가 돌아옵니다.
+
+### 5단계: 서버 여러 대 장면 재현하기
+
+```bash
+python -m demo.scenario
+```
+
+1장의 장면을 직접 재현합니다. 같은 데모 API를 두 대씩 띄우고, 서버마다 캐시를 따로 두는 경우와 mini-redis 하나를 함께 쓰는 경우에 똑같은 순서로 요청을 보낸 뒤, 결과를 표로 나란히 보여 줍니다. 서버는 이 명령이 알아서 띄우고 끄므로 다른 서버를 미리 띄울 필요가 없습니다. 20초쯤 걸립니다. 끝에 `--step`을 붙이면 `Enter`를 누를 때마다 한 단계씩 진행합니다.
+
+### 6단계: 캐시를 쓸 때와 안 쓸 때 속도 비교하기
+
+터미널 세 개를 열고, 각 터미널에서 2단계의 환경 켜기 명령을 먼저 입력한 뒤 하나씩 실행합니다.
+
+```bash
+python -m mini_redis.server      # 터미널 1
+python -m demo.app               # 터미널 2
+python -m bench.benchmark        # 터미널 3
+```
+
+터미널 1과 2는 mini-redis와 데모 API를 띄워 둡니다. 터미널 3의 측정 스크립트는 같은 목록을 캐시 없이 10번, 캐시를 써서 10번 조회하고 평균·최소·최대 응답 시간과 DB 조회 횟수를 표로 보여 줍니다. 데모의 DB는 조회마다 3초가 걸리게 만들어 두어서, 캐시 없이 조회하는 부분에만 30초쯤 걸립니다.
+
+### 7단계: 테스트 실행하기
+
+```bash
+python -m unittest -v
+```
+
+`tests/` 폴더의 테스트 63개를 모두 실행합니다. 테스트마다 이름과 결과가 한 줄씩 나오고, 마지막 줄에 `OK`가 나오면 모두 통과한 것입니다. 서버를 미리 띄울 필요는 없습니다.
 
 ## 더 보기
 
