@@ -2,7 +2,7 @@
 
 [← README로 돌아가기](../../README.md)
 
-| 항목 | 실제 Redis | 우리 구현 | 이유 |
+| 항목 | 실제 Redis | mini-redis | 이유 |
 | --- | --- | --- | --- |
 | 통신 | TCP 위 자체 프로토콜(RESP) | HTTP + JSON | `curl`로 바로 확인, 과제의 "외부에서 사용" |
 | 동시성 | 싱글 스레드 | Flask 멀티 스레드 + lock 하나 | Flask가 요청을 스레드로 받음. lock으로 같은 효과 |
