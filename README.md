@@ -156,7 +156,7 @@ python -m unittest -v
 | --- | --- |
 | 4. 구조 | [docs/readme/structure.md](docs/readme/structure.md) |
 | 5. API | [docs/readme/api.md](docs/readme/api.md) |
-| 6. 해시 테이블은 이렇게 동작한다 | [docs/readme/hashtable.md](docs/readme/hashtable.md) |
+| 6. 해시 테이블 | [docs/readme/hashtable.md](docs/readme/hashtable.md) |
 | 7. 성능 비교 | [docs/readme/performance.md](docs/readme/performance.md) |
 | 8. 테스트 | [docs/readme/tests.md](docs/readme/tests.md) |
 | 9. 실제 Redis와 다른 점 | [docs/readme/redis-differences.md](docs/readme/redis-differences.md) |
