@@ -184,3 +184,5 @@ python -m unittest tests.test_demo -v      # 14개, 서버를 띄우지 않고 1
 > 숫자는 측정 환경마다 다릅니다. `python -m bench.benchmark --markdown`으로 다시 재서 바꿔 넣으세요.
 
 실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
+
+8·9단계 발표 자료와 대본(PDF)은 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다.
