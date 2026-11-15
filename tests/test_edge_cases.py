@@ -58,7 +58,7 @@ class EdgeCaseTest(unittest.TestCase):
                 self.assertEqual(res.get_json(), {"deleted": True})
 
     def test_no_size_limit(self):
-        """크기 제한이 없다(소망 결정, DECISIONS.md 6단계): 키 10만 글자, 값 200만 글자도 저장된다."""
+        """크기 제한이 없다(docs/DECISIONS.md 6단계): 키 10만 글자, 값 200만 글자도 저장된다."""
         key, value = "k" * 100_000, "v" * 2_000_000
         self.assertEqual(self.client.post("/set", json={"key": key, "value": value}).status_code, 200)
         self.assertEqual(server.store.get(key), value)
