@@ -97,7 +97,7 @@ curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 �
 
 `--cache local`로 띄운 두 대에 같은 순서로 보내면 첫 `/me`부터 401이 나옵니다. 로그인을 받은 서버만 세션을 알기 때문입니다.
 
-## 설계 결정 (8·9단계)
+## 데모 API와 성능 비교의 설계 결정
 
 | | 결정 | 이유 |
 |---|---|---|
@@ -186,4 +186,5 @@ python -m unittest tests.test_demo -v      # 14개, 서버를 띄우지 않고 1
 
 실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
 
-8·9단계를 어떻게 만들고 검증했는지 설명한 발표 자료는 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. 슬라이드 PDF는 바로 열어 볼 수 있고, 서버 A·B 화면이 움직이는 모습은 HTML 파일을 내려받아 브라우저로 열면 볼 수 있습니다.
+데모 API와 성능 비교를 어떻게 만들고 검증했는지 설명한 발표 자료는 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. 슬라이드 PDF는 바로 열어 볼 수 있고, 서버 A·B 화면이 움직이는 모습은 HTML 파일을 내려받아 브라우저로 열면 볼 수 있습니다.
+
