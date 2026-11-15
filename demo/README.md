@@ -185,4 +185,4 @@ python -m unittest tests.test_demo -v      # 14개, 서버를 띄우지 않고 1
 
 실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
 
-8·9단계 발표 자료와 대본(PDF)은 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다.
+8·9단계 발표 자료는 [feat/8-demo 브랜치 docs/eungi](https://github.com/team1-mini-lab/mini-redis/tree/feat/8-demo/docs/eungi)에 있습니다. 슬라이드 PDF는 바로 열어 볼 수 있고, 서버 A·B 화면이 움직이는 모습은 HTML 파일을 내려받아 브라우저로 열면 볼 수 있습니다.
