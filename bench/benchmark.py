@@ -23,8 +23,9 @@ MIN_REQUESTS = 2
 
 def main():
     args = parse_arguments()
-    exit_if_demo_api_is_down()
+    settings = check_demo_api()
     result = measure(args.n)
+    result.update(settings)
     if args.markdown:
         print_markdown_table(result)
     else:
@@ -41,14 +42,32 @@ def parse_arguments():
     return args
 
 
-def exit_if_demo_api_is_down():
+def check_demo_api():
+    """데모 API와 mini-redis가 켜져 있는지 보고, 측정 조건(DB 지연, TTL)을 받아 온다."""
     try:
-        requests.get(f"{DEMO_URL}/", timeout=2).raise_for_status()
+        response = requests.get(f"{DEMO_URL}/", timeout=2)
+        response.raise_for_status()
     except requests.RequestException:
         print(f"데모 API({DEMO_URL})에 연결할 수 없습니다. 먼저 실행하세요:", file=sys.stderr)
         print("  python -m mini_redis.server   (터미널 1)", file=sys.stderr)
         print("  python -m demo.app            (터미널 2)", file=sys.stderr)
         sys.exit(1)
+    health = response.json()
+    if health.get("cache_status") != "up":
+        # mini-redis가 꺼져 있으면 "캐시 사용"도 매번 DB로 가서 비교가 뜻이 없다.
+        print("mini-redis에 연결할 수 없습니다. 먼저 실행하세요:", file=sys.stderr)
+        print("  python -m mini_redis.server   (터미널 1)", file=sys.stderr)
+        sys.exit(1)
+    return {
+        "db_delay": health.get("db_delay_seconds"),
+        "cache_ttl": health.get("cache_ttl_seconds"),
+    }
+
+
+def format_seconds(seconds):
+    if seconds is None:
+        return "알 수 없음"
+    return f"{seconds:g}초"
 
 
 def measure(request_count):
@@ -150,6 +169,8 @@ def print_terminal_table(result):
     nocache, hit = result["nocache"], result["hit"]
     print("\n" + "=" * 62)
     print(f"  거래량 상위 종목 조회 성능 비교 (각 {result['n']}회)")
+    print(f"  가짜 DB 지연 {format_seconds(result['db_delay'])}, "
+          f"캐시 TTL {format_seconds(result['cache_ttl'])}")
     print("=" * 62)
     print(f"  {'경우':<22}{'평균':>10}{'최소':>10}{'최대':>10}")
     print("  " + "-" * 58)
@@ -171,7 +192,8 @@ def print_terminal_table(result):
 def print_markdown_table(result):
     nocache, hit = result["nocache"], result["hit"]
     print()
-    print(f"각 {result['n']}회 측정. 가짜 DB 지연 3초, 캐시 TTL 60초.")
+    print(f"각 {result['n']}회 측정. 가짜 DB 지연 {format_seconds(result['db_delay'])}, "
+          f"캐시 TTL {format_seconds(result['cache_ttl'])}.")
     print()
     print("| 경우 | 평균 | 최소 | 최대 |")
     print("| --- | --- | --- | --- |")

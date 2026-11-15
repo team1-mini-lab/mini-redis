@@ -39,6 +39,8 @@ def health():
         "server": server_name(),
         "cache": cache.name,
         "cache_status": "up" if cache.ping() else "down",
+        "db_delay_seconds": db.QUERY_DELAY,
+        "cache_ttl_seconds": TOP_STOCKS_TTL,
     })
 
 
