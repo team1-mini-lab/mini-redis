@@ -17,7 +17,7 @@
 | [DECISIONS.md](./DECISIONS.md) | 개인 결정 기록 (확정 / 미결정) | 완료 |
 | [CROSS_CHECK_FIXES.md](./CROSS_CHECK_FIXES.md) | 교차 검증(같은 요청 23개)에서 찾은 빈틈과 고친 방법 | 완료 |
 
-팀 공유용 "왜 레디스인가" 설명은 [docs/study/why_redis/WHY_REDIS.md)에 있습니다.
+팀 공유용 "왜 레디스인가" 설명은 [docs/study/why_redis/WHY_REDIS.md](../study/why_redis/WHY_REDIS.md)에 있습니다.
 
 ## 실행 방법
 
