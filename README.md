@@ -92,11 +92,17 @@ mini-redis(포트 8000), 데모 API(포트 8001), 미니 증권 화면(포트 80
 
 ### 4단계: mini-redis에 직접 요청 보내 보기
 
+#### 4-1. mini-redis 서버 띄우기
+
 ```bash
 python -m mini_redis.server
 ```
 
-mini-redis 서버만 포트 8000에 띄웁니다. 이 터미널은 서버가 쓰고 있으니 그대로 두고, 터미널을 하나 더 열어 아래 명령을 차례로 입력합니다.
+mini-redis 서버만 포트 8000에 띄웁니다. 서버가 켜져 있는 동안 이 터미널은 서버가 계속 쓰고 있으므로, 닫지 말고 그대로 둡니다.
+
+#### 4-2. 새 터미널에서 요청 보내기
+
+터미널을 하나 더 열고 `mini-redis` 폴더로 들어간 뒤, 아래 명령을 차례로 입력합니다.
 
 ```bash
 curl -X POST localhost:8000/set -H "Content-Type: application/json" -d '{"key":"name","value":"mini","ttl":5}'
