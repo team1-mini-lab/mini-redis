@@ -20,7 +20,7 @@ python -m bench.benchmark      # 터미널 3 — 성능 비교
 서버가 한 대면 파이썬 `dict`로 만든 로컬 캐시도 mini-redis와 똑같이 동작합니다. 차이는 **서버가 여러 대일 때** 드러납니다. 그래서 같은 데모 API를 두 대씩 띄우고, 캐시 위치만 바꿔서 똑같은 순서로 요청을 보냅니다.
 
 ```bash
-python -m demo.scenario            # 처음부터 끝까지 자동으로 (약 20초)
+python -m demo.scenario            # 처음부터 끝까지 자동으로 (약 30초)
 python -m demo.scenario --step     # Enter를 누를 때마다 한 단계씩 (발표용)
 python -m demo.scenario --delay 1  # DB 지연을 1초로 줄여서 빠르게
 ```
@@ -68,14 +68,14 @@ python -m demo.app --port 8102 --cache local
 
 ```bash
 curl localhost:8001/stocks/top        # source=db,    약 3000ms, SW-AI 50000원
-curl localhost:8001/stocks/top        # source=cache, 약 2ms,    SW-AI 50000원
+curl localhost:8001/stocks/top        # source=cache, 약 4ms,    SW-AI 50000원
 
 curl -X PUT localhost:8001/stocks/1/price \
      -H "Content-Type: application/json" -d '{"price":40000}'
                                             # cache_invalidated=true
 
 curl localhost:8001/stocks/top        # source=db,    약 3000ms, SW-AI 40000원
-curl localhost:8001/stocks/top        # source=cache, 약 2ms,    SW-AI 40000원
+curl localhost:8001/stocks/top        # source=cache, 약 4ms,    SW-AI 40000원
 ```
 
 ## 시연 순서: 로그인이 풀리는 문제를 공용 저장소로 해결
@@ -104,13 +104,31 @@ curl -i "localhost:8002/me?token=$TOKEN"    # 401 로그인이 필요합니다 �
 | mini-redis를 HTTP로 호출 | 과제의 "외부에서 사용". import하면 같은 프로세스라 공용 저장소를 보여 줄 수 없음 |
 | 쓰기 때 캐시를 **덮어쓰지 않고 지움** | 덮어쓰면 "DB 수정"과 "캐시 수정" 순서가 어긋날 때 옛 값이 남을 수 있음. 지우면 다음 읽기가 반드시 DB에서 최신 값을 가져옴 |
 | DB 먼저 고치고, 그다음 캐시 삭제 | 캐시를 먼저 지우면, DB를 고치기 전에 다른 요청이 옛 값을 다시 캐시에 채울 수 있음 |
+| 캐시 삭제가 실패해도 가격 수정은 성공으로 처리 | 원본(DB)이 맞는 게 우선. 응답의 `cache_invalidated: false`로 알리고, 남은 옛 값은 TTL이 지나면 사라짐 |
+| 종목 하나가 바뀌어도 목록 키 전체를 지움 | 거래량 상위 목록을 키 하나에 통째로 저장하기 때문. 그 종목만 골라 고치는 것보다 단순하고, 다음 조회 한 번으로 다시 채워짐 |
+| mini-redis 호출 타임아웃 1초 (`cache.py`의 `TIMEOUT_SECONDS`) | mini-redis가 응답하지 않을 때 고객이 오래 기다리지 않고 바로 DB로 넘어가게 |
 | TTL 60초를 함께 줌 | 무효화를 깜빡해도 60초 뒤엔 사라지는 안전망. 값을 정한 근거는 아래 「TTL 60초는 어떻게 정했나」 |
 | mini-redis가 죽어도 DB로 응답 | 캐시는 성능 문제일 뿐 기능 문제가 아님. 통신 실패를 "캐시 미스"로 처리 (Cache-Aside라 가능) |
 | 성능 비교는 `?nocache=1`로 | 같은 코드 경로에서 캐시만 빼서, 다른 조건은 똑같이 유지 |
 | 가짜 DB는 SQLite 파일 | 서버를 여러 대 띄워도 원본은 하나여야 함. `dict`로 두면 서버마다 DB가 따로 생겨 시연이 성립하지 않음. 실제 서비스도 앱 서버는 여러 대, DB는 공유 |
 | 로컬 캐시 모드(`--cache local`)를 일부러 둠 | 문제가 생기는 모습을 먼저 봐야 mini-redis로 풀리는 게 보임. 앱 코드는 그대로 두고 캐시만 바꿔 끼워 비교 |
-| 세션에 별도 기능을 만들지 않음 | 세션도 키-값이라 거래량 상위 종목과 같은 `set` / `get`으로 끝남. 로그인 유지 시간이 그대로 TTL이 됨 (`DEMO_SESSION_TTL`, 기본 30분) |
+| 로컬 캐시도 mini-redis와 같은 TTL·지연 삭제로 구현 | 시연의 1부(로컬 캐시)와 2부(mini-redis)의 차이가 캐시 위치 하나뿐이어야 비교가 성립함 |
+| 세션에 별도 기능을 만들지 않음 | 세션도 키-값이라 거래량 상위 종목과 같은 `set` / `get`으로 끝남. 로그인 유지 시간이 그대로 TTL이 됨 (`DEMO_SESSION_TTL`, 기본 30분). 30분은 흔히 쓰는 로그인 유지 시간(30분~하루) 중 짧은 쪽 |
 | 첫 조회(미스)와 이후(히트)를 따로 측정 | 섞어서 평균을 내면 측정 횟수에 따라 숫자가 달라져 뜻이 없어짐 |
+| 시간은 클라이언트(벤치마크)에서 잼 | 고객이 실제로 기다리는 시간이라서. 서버가 돌려주는 `elapsed_ms`에는 네트워크 왕복이 빠짐 |
+| 응답 시간과 함께 DB 조회 횟수를 셈 | 캐시의 목적은 DB 보호. 배수는 가짜 DB 지연에 따라 달라지지만, 막은 건수는 그렇지 않음 |
+
+### 만료와 무효화는 어디서 일어나나
+
+| | 만료 (expiration) | 무효화 (invalidation) |
+|---|---|---|
+| 누가 지우나 | mini-redis (앱은 저장할 때 TTL만 정함) | 데모 API |
+| 언제 | TTL이 지난 키를 조회할 때 (지연 삭제) | DB를 고친 직후 |
+| 코드 | `mini_redis/store.py`의 `get()` — 만료 시점이 지났으면 지우고 「없음」 | `demo/app.py`의 `update_price()` → `invalidate_top_stocks()` → `DELETE /delete` |
+| 남는 틈 | 아무도 조회하지 않는 만료 키는 메모리에 남음 (주기적 정리는 13단계) | 수정 직전에 시작된 조회가 DB에서 옛 값을 읽어, 삭제가 끝난 뒤 캐시에 다시 넣을 수 있음 |
+| 테스트 | `test_expired_cache_goes_back_to_db` | `test_price_update_invalidates_cache` |
+
+두 방식은 함께 씁니다. 무효화가 정상이면 만료가 오기 전에 이미 지워지고, 무효화를 놓친 경우(삭제 실패, 위의 틈, 앱을 거치지 않은 DB 수정)에만 만료가 안전망으로 일합니다.
 
 ### TTL 60초는 어떻게 정했나
 
@@ -134,7 +152,7 @@ TTL은 무효화의 대체가 아니라 **안전망**입니다. 무효화가 제
 ## 테스트
 
 ```bash
-python -m pytest tests/test_demo.py -v     # 14개, 서버를 띄우지 않고 1초 안에 끝남
+python -m unittest tests.test_demo -v      # 14개, 서버를 띄우지 않고 1초 안에 끝남
 ```
 
 서버를 띄우지 않고 Flask `test_client`로 요청을 보냅니다. mini-redis 쪽도 실제 `mini_redis/server.py`를 `test_client`로 부르므로, 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 그대로 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다.
@@ -164,3 +182,5 @@ python -m pytest tests/test_demo.py -v     # 14개, 서버를 띄우지 않고 1
 - 첫 조회는 캐시에 값이 없어 느린 것이 정상입니다. 캐시의 효과는 그 다음부터 나옵니다.
 
 > 숫자는 측정 환경마다 다릅니다. `python -m bench.benchmark --markdown`으로 다시 재서 바꿔 넣으세요.
+
+실제 Redis와 어디가 다르고 왜 그렇게 했는지는 [docs/eungi/REDIS_COMPARISON.md](../docs/eungi/REDIS_COMPARISON.md)에 정리되어 있습니다.
