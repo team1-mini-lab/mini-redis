@@ -19,9 +19,9 @@ mini_redis/hashtable.py  FNV-1a 해시 · 체이닝 · 0.75 넘으면 2배 확�
 
 | 폴더 | 내용 |
 | --- | --- |
-| `mini_redis/` | mini-redis 본체 (0~6단계) |
-| `demo/` | 캐시를 쓰는 데모 API, 가짜 DB(SQLite, 3초 지연), 시연 스크립트 (8단계) |
-| `bench/` | 캐시 사용·미사용 응답 시간 비교 (9단계) |
+| `mini_redis/` | mini-redis 본체 |
+| `demo/` | 캐시를 쓰는 데모 API, 가짜 DB(SQLite, 3초 지연), 시연 스크립트 |
+| `bench/` | 캐시 사용·미사용 응답 시간 비교 |
 | `stock/` | 데모 API를 화면으로 보여 주는 주식 매수 페이지 (거래량 상위 종목, 시세 변경, 캐시 켜고 끄기) |
 | `deploy/` | 세 서버(mini-redis, 데모 API, 주식 화면)를 한 번에 띄우는 배포용 시작 스크립트 |
 | `tests/` | 단위·기능·동시 요청 테스트 (63개) |
