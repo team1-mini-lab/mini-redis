@@ -50,7 +50,7 @@ https://mini-stock-tu7t.onrender.com
 
 ## 3. 직접 실행
 
-코드를 받아 내 컴퓨터에서 직접 돌려 보는 방법입니다. Python 3(3.13에서 확인)과 Git이 설치되어 있어야 합니다. 아래 명령은 모두 터미널에 입력합니다. Windows에서는 PowerShell을 쓰되, `curl`이 나오는 4단계만 Git Bash에서 실행하는 것이 편합니다.
+코드를 받아 내 컴퓨터에서 직접 돌려 보는 방법입니다. Python 3과 Git이 설치되어 있어야 합니다. 아래 명령은 모두 터미널에 입력합니다. Windows에서는 PowerShell을 쓰되, `curl`이 나오는 4단계만 Git Bash에서 실행하는 것이 편합니다.
 
 ### 1단계: 코드 받기
 
