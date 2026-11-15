@@ -158,16 +158,7 @@ python -m unittest tests.test_demo -v      # 22개, 3초 안에 끝남
 
 설계 결정별 테스트는 위 「설계 결정」 표의 "확인" 칸에 있습니다. 그 밖에 잘못된 입력(가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400)을 `test_bad_price`, `test_unknown_stock`, `test_session_input`이 확인합니다.
 
-테스트가 진짜로 결정을 지키는지도 확인했습니다. 코드를 일부러 망가뜨리면 해당 테스트가 실패합니다. `python docs/eungi/check_tests_catch_bugs.py`로 다시 돌려 볼 수 있고, 테스트를 추가한 과정은 [docs/eungi/TEST_RECORD.md](../docs/eungi/TEST_RECORD.md)에 있습니다.
-
-- 캐시 삭제 줄을 빼면 `test_price_update_invalidates_cache`, `test_mini_redis_stays_consistent`, `test_db_is_updated_before_cache_delete`가 실패
-- DB 수정과 캐시 삭제의 순서를 바꾸면 `test_db_is_updated_before_cache_delete`가 실패
-- 로컬 캐시가 TTL을 무시하게 하면 `test_local_cache_expires_the_same_way`가 실패
-- 타임아웃 기본값을 5초로 바꾸면 `test_slow_mini_redis_times_out`이 실패
-- 캐시 삭제가 실패할 때 500을 돌려주게 하면 `test_write_still_succeeds`가 실패
-- `?nocache=1`이어도 캐시를 쓰게 하면 `test_nocache_skips_cache`가 실패
-- 통신 실패를 예외로 터뜨리게 하면 `test_read_answers_from_db`가 실패
-- 세션 TTL을 빼면 `test_session_expires_after_ttl`이 실패
+테스트가 진짜로 결정을 지키는지도 확인했습니다. 코드를 일부러 망가뜨리면 해당 테스트가 실패합니다. `python docs/eungi/check_tests_catch_bugs.py`로 다시 돌려 볼 수 있고, 테스트를 추가한 과정과 12개 변이 검사 결과는 [docs/eungi/TEST_RECORD.md](../docs/eungi/TEST_RECORD.md)에 있습니다.
 
 ### 알고 남겨 둔 한계
 
