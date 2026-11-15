@@ -172,7 +172,8 @@ python -m unittest tests.test_demo -v      # 22개, 3초 안에 끝남
 
 **테스트가 정말 잡아내는지**
 
-코드를 일부러 12군데 망가뜨렸고, 12군데 모두 테스트가 실패했습니다. 예를 들어 `update_price()`에서 캐시를 지우는 줄을 빼면 `test_price_update_invalidates_cache`가 실패합니다.
+코드를 일부러 12군데 망가뜨렸고, 12군데 모두 테스트가 실패했습니다. 
+예를 들어 `update_price()`에서 캐시를 지우는 줄을 빼면 `test_price_update_invalidates_cache`가 실패합니다.
 
 ```bash
 python docs/eungi/check_tests_catch_bugs.py   # 다시 돌려 보기
