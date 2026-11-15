@@ -6,6 +6,7 @@
     3. 캐시가 죽어도 — DB로 응답하고, 가격 수정도 성공한다
     4. 만료 — TTL이 지나면 다시 DB로 간다
     5. 잘못된 입력 — 400 / 404
+    6. 무효화 순서 — DB를 먼저 고치고 그다음 캐시를 지운다
 
 서버를 띄우지 않는다. Flask의 test_client로 요청을 보낸다.
 mini-redis 쪽도 실제 mini_redis/server.py 코드를 test_client로 부르므로,
@@ -17,7 +18,9 @@ mini-redis 쪽도 실제 mini_redis/server.py 코드를 test_client로 부르므
 DB는 두 경우 모두 임시 SQLite 파일 하나를 함께 쓴다.
 """
 import os
+import socket
 import tempfile
+import threading
 import time
 import unittest
 
@@ -175,6 +178,23 @@ class CacheDownTest(DemoTestCase):
         self.assertFalse(res.get_json()["cache_invalidated"])   # 지우지 못했다고 알려 준다
         self.assertEqual(db.get_product(1)["price"], 40000)     # DB는 고쳐졌다
 
+    def test_slow_mini_redis_times_out(self):
+        """연결은 받지만 답하지 않는 mini-redis. 타임아웃이 지나면 기다리지 않고 DB로 간다."""
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        accepted = []
+        threading.Thread(target=lambda: accepted.append(listener.accept()), daemon=True).start()
+        self.addCleanup(listener.close)
+
+        slow = RedisCache(f"http://127.0.0.1:{listener.getsockname()[1]}")
+        slow._warned = True
+        slow.TIMEOUT = 0.2                            # 1초를 기다리지 않으려고 줄임
+
+        started = time.monotonic()
+        self.assertEqual(self.popular(slow), ("db", 50000))
+        self.assertLess(time.monotonic() - started, 2)   # 무한정 기다리지 않았다
+
 
 class ExpiryTest(DemoTestCase):
     """TTL이 지나면 캐시가 사라지고 다시 DB로 간다 (무효화를 놓쳤을 때의 안전망)."""
@@ -196,6 +216,32 @@ class ExpiryTest(DemoTestCase):
         self.assertEqual(self.popular(cache), ("cache", 50000))   # 아직 옛 값
         time.sleep(0.1)
         self.assertEqual(self.popular(cache), ("db", 40000))      # TTL이 지나 저절로 맞음
+
+    def test_local_cache_expires_the_same_way(self):
+        """비교가 공정하려면 로컬 캐시도 mini-redis와 똑같이 만료돼야 한다."""
+        demo_app.POPULAR_TTL = 0.05
+        cache = LocalCache()
+        self.popular(cache)
+        self.assertEqual(self.popular(cache)[0], "cache")
+        time.sleep(0.1)
+        self.assertEqual(self.popular(cache)[0], "db")
+
+
+class InvalidationOrderTest(DemoTestCase):
+    """DB를 먼저 고치고, 그다음 캐시를 지운다."""
+
+    def test_db_is_updated_before_cache_delete(self):
+        price_seen_at_delete = []
+
+        class Spy(InProcessMiniRedis):
+            def delete(self, key):
+                price_seen_at_delete.append(db.get_product(1)["price"])   # 지우는 순간의 DB 가격
+                return super().delete(key)
+
+        cache = Spy()
+        self.popular(cache)
+        self.set_price(cache, 40000)
+        self.assertEqual(price_seen_at_delete, [40000])   # 지울 때 DB는 이미 새 가격
 
 
 class ValidationTest(DemoTestCase):
