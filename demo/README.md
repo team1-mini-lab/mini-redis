@@ -150,15 +150,28 @@ TTL은 무효화의 대체가 아니라 **안전망**입니다. 무효화가 제
 
 ## 테스트
 
-```bash
+```
 python -m unittest tests.test_demo -v      # 22개, 3초 안에 끝남
 ```
+테스트 22개가 각각 무엇을 확인하는지, 변이 검사 결과, 검토하며 고친 내용은 [docs/eungi/TEST_RECORD.md](../docs/eungi/TEST_RECORD.md)에 있습니다.
 
-서버를 띄우지 않고 Flask `test_client`로 요청을 보냅니다. mini-redis 쪽도 실제 `mini_redis/server.py`를 `test_client`로 부르므로, 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 그대로 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다. `RealHttpTest`만은 mini-redis를 실제 포트에 띄우고, 데모 API가 쓰는 `RedisCache` 그대로 네트워크로 요청합니다.
+**어떻게 돌리는지**
 
-설계 결정별 테스트는 위 「설계 결정」 표의 "확인" 칸에 있습니다. 그 밖에 잘못된 입력(가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400)을 `test_bad_price`, `test_unknown_stock`, `test_session_input`이 확인합니다.
+| 테스트 | 방법 |
+|---|---|
+| 대부분 (19개) | 서버를 띄우지 않고 Flask `test_client`로 요청합니다. mini-redis도 실제 `mini_redis/server.py`를 `test_client`로 부르므로 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다. |
+| `RealHttpTest` (3개) | mini-redis를 실제 포트에 띄우고, 배포와 같은 `RedisCache`로 네트워크 요청을 보냅니다. |
 
-테스트가 진짜로 결정을 지키는지도 확인했습니다. 코드를 일부러 망가뜨리면 해당 테스트가 실패합니다. `python docs/eungi/check_tests_catch_bugs.py`로 다시 돌려 볼 수 있고, 테스트를 추가한 과정과 12개 변이 검사 결과는 [docs/eungi/TEST_RECORD.md](../docs/eungi/TEST_RECORD.md)에 있습니다.
+**무엇을 확인하는지**
+
+| 대상 | 테스트 |
+|---|---|
+| 설계 결정 | 위 「설계 결정」 표의 "확인" 칸 |
+| 잘못된 입력 (가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400) | `test_bad_price`, `test_unknown_stock`, `test_session_input` |
+
+**테스트가 정말 잡아내는지**
+
+코드를 일부러 망가뜨려도 테스트가 실패하는지 확인했습니다. 예를 들어 `update_price()`에서 캐시를 지우는 줄을 빼면 `test_price_update_invalidates_cache`가 실패합니다. 이렇게 12군데를 망가뜨려 보니 12군데 모두 테스트가 실패했습니다. `python docs/eungi/check_tests_catch_bugs.py`로 다시 돌려 볼 수 있습니다.
 
 ### 알고 남겨 둔 한계
 
