@@ -141,7 +141,7 @@ class ScenarioPart:
             note("→ B도 같은 mini-redis를 봄 → A가 저장한 걸 그대로 꺼냄. DB는 한 번만")
 
     def admin_discounts_keyboard_through_server_a(self):
-        self.begin_step(f"③ 관리자가 SW-AI를 {NEW_PRICE:,}원으로 할인. 요청은 서버 A로 감")
+        self.begin_step(f"③ 관리자가 SW-AI 시세를 {NEW_PRICE:,}원으로 변경. 요청은 서버 A로 감")
         cache_invalidated = request_price_change(self.port_a, NEW_PRICE)["cache_invalidated"]
         print(f"    서버 A({self.port_a})  가격 수정 → SW-AI {NEW_PRICE:,}원"
               f"   (캐시 삭제: {cache_invalidated})")
@@ -319,7 +319,7 @@ def terminate(process):
 def print_summary(local, redis):
     rows = [
         ("② 처음 채울 때 DB 조회 (장면 ④)", times(local["fill_queries"]), times(redis["fill_queries"])),
-        ("④ 할인 후 서버 B가 본 가격 (장면 ①)", won(local["b_price"]), won(redis["b_price"])),
+        ("④ 시세 변경 후 서버 B가 본 가격 (장면 ①)", won(local["b_price"]), won(redis["b_price"])),
         ("⑤ 재시작 후 첫 조회 (장면 ③)", source_name(local["after_restart"]), source_name(redis["after_restart"])),
         ("⑦ 서버 B가 로그인을 알아보나 (장면 ②)", session_status(local["session_b"]), session_status(redis["session_b"])),
         ("전체 DB 조회", times(local["total_queries"]), times(redis["total_queries"])),

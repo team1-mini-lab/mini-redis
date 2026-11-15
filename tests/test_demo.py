@@ -125,7 +125,7 @@ class TwoServersTest(DemoTestCase):
     """서버가 두 대일 때. 같은 순서로 요청하고 캐시 위치만 바꾼다."""
 
     def run_scene(self, cache_a, cache_b):
-        """A 조회 → B 조회 → A에서 할인 → B 조회. (B의 첫 조회 출처, 할인 후 B가 본 가격)"""
+        """A 조회 → B 조회 → A에서 시세 변경 → B 조회. (B의 첫 조회 출처, 시세 변경 후 B가 본 가격)"""
         self.popular(cache_a)
         b_first, _ = self.popular(cache_b)
         self.set_price(cache_a, 40000)
