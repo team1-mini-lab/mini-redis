@@ -15,15 +15,15 @@
 
 그런데 프로그램 안의 `dict`는 네트워크를 거치지 않으니 캐시 중에서 가장 빠릅니다. Redis 같은 캐시는 서버 밖의 별도 프로그램이라 요청마다 네트워크를 한 번 더 오가야 해서, 프로그램 안의 `dict`보다 느립니다. **더 빠른 방법을 두고 왜 굳이 캐시를 서버 밖에 두게 되었을까요?**
 
-![장면 1 가격이 왔다 갔다](docs/images/scene-1.svg)
+![장면 1 데이터가 바뀌어도 다른 서버는 옛 값을 줌](docs/images/scene-1.svg)
 
 ![장면 2 로그인이 풀림](docs/images/scene-2.svg)
 
-![장면 3 배포하면 DB가 몰림](docs/images/scene-3.svg)
+![장면 3 재시작하면 DB로 요청이 몰림](docs/images/scene-3.svg)
 
 ![장면 4 같은 데이터를 서버 수만큼 저장](docs/images/scene-4.svg)
 
-![장면 5 함께 세야 하는 값이 틀림](docs/images/scene-5.svg)
+![장면 5 함께 세야 하는 값이 어긋남](docs/images/scene-5.svg)
 
 ## 2. 실행 방법
 
