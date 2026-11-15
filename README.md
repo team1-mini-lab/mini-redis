@@ -7,16 +7,6 @@
 1. [redis는 왜 만들어졌나?](#1-redis는-왜-만들어졌나)
 2. [실행 방법](#2-실행-방법)
 
-| 더 보기 | 문서 |
-| --- | --- |
-| 3. 구조 | [docs/readme/structure.md](docs/readme/structure.md) |
-| 4. API | [docs/readme/api.md](docs/readme/api.md) |
-| 5. 해시 테이블은 이렇게 동작한다 | [docs/readme/hashtable.md](docs/readme/hashtable.md) |
-| 6. 성능 비교 | [docs/readme/performance.md](docs/readme/performance.md) |
-| 7. 테스트 | [docs/readme/tests.md](docs/readme/tests.md) |
-| 8. 실제 Redis와 다른 점 | [docs/readme/redis-differences.md](docs/readme/redis-differences.md) |
-| 9. 결정 기록과 문서 모음 | [docs/readme/documents.md](docs/readme/documents.md) |
-
 ## 1. redis는 왜 만들어졌나?
 
 서버가 한 대라면 캐시는 서버 메모리의 `dict` 하나로 충분합니다. 사용자가 늘어 서버가 여러 대가 되면, 서버마다 따로 들고 있는 캐시 때문에 문제가 생깁니다.
@@ -61,3 +51,15 @@ curl "localhost:8000/get?key=name"        # 200 {"key":"name","value":"mini"}
 # 5초 뒤
 curl "localhost:8000/get?key=name"        # 404 {"error":"not found"}
 ```
+
+## 더 보기
+
+| 더 보기 | 문서 |
+| --- | --- |
+| 3. 구조 | [docs/readme/structure.md](docs/readme/structure.md) |
+| 4. API | [docs/readme/api.md](docs/readme/api.md) |
+| 5. 해시 테이블은 이렇게 동작한다 | [docs/readme/hashtable.md](docs/readme/hashtable.md) |
+| 6. 성능 비교 | [docs/readme/performance.md](docs/readme/performance.md) |
+| 7. 테스트 | [docs/readme/tests.md](docs/readme/tests.md) |
+| 8. 실제 Redis와 다른 점 | [docs/readme/redis-differences.md](docs/readme/redis-differences.md) |
+| 9. 결정 기록과 문서 모음 | [docs/readme/documents.md](docs/readme/documents.md) |
