@@ -153,20 +153,41 @@ TTL은 무효화의 대체가 아니라 **안전망**입니다. 무효화가 제
 ## 테스트
 
 ```bash
-python -m unittest tests.test_demo -v      # 14개, 서버를 띄우지 않고 1초 안에 끝남
+python -m unittest tests.test_demo -v      # 17개, 서버를 띄우지 않고 1초 안에 끝남
 ```
 
 서버를 띄우지 않고 Flask `test_client`로 요청을 보냅니다. mini-redis 쪽도 실제 `mini_redis/server.py`를 `test_client`로 부르므로, 데모 API → mini-redis HTTP API → 저장소 → 해시 테이블까지 실제 코드가 그대로 돕니다. "서버 두 대"는 요청마다 데모 API가 쓰는 캐시 객체를 바꿔 끼워 흉내 냅니다.
 
-| 묶음 | 확인하는 것 |
-|---|---|
-| 완료 기준 | 두 번째 조회는 캐시에서(DB 1회) · 가격 수정 후 새 가격 · `?nocache=1`은 캐시를 안 씀 |
-| 서버 두 대 | 로컬 캐시는 B가 옛 가격(50,000원)을 봄 · mini-redis는 B도 새 가격 · 세션도 같은 차이(401 / 알아봄) · 로그아웃은 모든 서버에서 |
-| 캐시가 죽으면 | 조회는 DB로 답함 · 가격 수정도 성공하고 `cache_invalidated: false` |
-| 만료 | TTL이 지나면 다시 DB · DB를 앱 밖에서 고쳐도(무효화 실패) TTL이 지나면 저절로 맞음 |
-| 잘못된 입력 | 가격이 음수·문자·소수·true면 400 · 없는 종목 404 · 로그인 본문 없으면 400 |
+설계 결정마다 그것을 확인하는 테스트가 있습니다.
 
-캐시 삭제를 일부러 빼고 돌려 보면 "가격 수정 후 새 가격", "mini-redis는 B도 새 가격", "로그아웃" 세 테스트가 실패합니다. 무효화가 빠지면 테스트가 잡아냅니다.
+| 설계 결정 | 확인하는 테스트 |
+| --- | --- |
+| **조회와 무효화** | |
+| Cache-Aside: 두 번째 조회는 캐시에서 | `test_second_read_comes_from_cache` |
+| 수정하면 덮어쓰지 않고 목록 키를 지움 | `test_price_update_invalidates_cache` |
+| DB를 먼저 고치고 그다음 캐시를 지움 | `test_db_is_updated_before_cache_delete` |
+| 캐시 삭제가 실패해도 수정은 성공, `cache_invalidated: false` | `test_write_still_succeeds` |
+| **서버 두 대** | |
+| 로컬 캐시는 B가 옛 가격, mini-redis는 B도 새 가격 | `test_local_cache_goes_stale`, `test_mini_redis_stays_consistent` |
+| 세션도 같은 set / get: 로컬 캐시는 401, mini-redis는 로그인 유지 | `test_session_local_cache_logs_out_on_other_server`, `test_session_mini_redis_keeps_login` |
+| **만료(TTL)** | |
+| TTL이 지나면 다시 DB로 | `test_expired_cache_goes_back_to_db` |
+| 무효화를 놓쳐도 TTL이 지나면 저절로 맞음 | `test_ttl_heals_missed_invalidation` |
+| 로컬 캐시도 같은 방식으로 만료 | `test_local_cache_expires_the_same_way` |
+| **장애 대비** | |
+| mini-redis가 꺼져도 DB로 응답 | `test_read_answers_from_db` |
+| 응답이 없으면 타임아웃 후 DB로 | `test_slow_mini_redis_times_out` |
+| **성능 비교** | |
+| `?nocache=1`은 캐시를 쓰지도 채우지도 않음 | `test_nocache_skips_cache` |
+| **잘못된 입력** | |
+| 가격이 음수·문자·소수·true면 400, 없는 종목 404, 로그인 본문 없으면 400 | `test_bad_price`, `test_unknown_stock`, `test_session_input` |
+
+테스트가 진짜로 결정을 지키는지도 확인했습니다. 코드를 일부러 망가뜨리면 해당 테스트가 실패합니다.
+
+- 캐시 삭제 줄을 빼면 "가격 수정 후 새 가격", "mini-redis는 B도 새 가격", "로그아웃" 세 테스트가 실패
+- DB 수정과 캐시 삭제의 순서를 바꾸면 `test_db_is_updated_before_cache_delete`가 실패
+- 로컬 캐시가 TTL을 무시하게 하면 `test_local_cache_expires_the_same_way`가 실패
+- 타임아웃을 5초로 늘리면 `test_slow_mini_redis_times_out`이 실패
 
 ## 측정 결과
 
