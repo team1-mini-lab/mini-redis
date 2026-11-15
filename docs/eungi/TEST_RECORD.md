@@ -30,21 +30,65 @@ python docs/eungi/check_tests_catch_bugs.py     # 변이 검사 12가지
 
 ## 2. 검토 뒤 추가한 테스트 (8개)
 
-설계 결정과 테스트를 한 줄씩 짝지어 보니 테스트가 없는 결정이 있었고, 별도의 AI 검토자에게 검토를 맡기자 차이 몇 개가 더 나왔습니다.
+설계 결정을 12가지로 정리한 뒤, 결정마다 테스트를 하나씩 짝지으면서 추가한 테스트입니다. 별도의 AI 검토자에게 검토를 맡겨 짝이 비어 있던 곳을 더 찾았습니다.
 
 | 왜 추가했나 | 테스트 | 확인하는 것 |
 |---|---|---|
-| 결정에 테스트가 없었음 | `test_db_is_updated_before_cache_delete` | 캐시를 지우는 순간 DB는 이미 새 가격 (DB 먼저, 캐시 나중) |
+| 결정마다 짝을 맞춤 | `test_db_is_updated_before_cache_delete` | 캐시를 지우는 순간 DB는 이미 새 가격 (DB 먼저, 캐시 나중) |
 | | `test_slow_mini_redis_times_out` | 연결만 받고 답하지 않는 mini-redis 앞에서 기다리지 않고 DB로 감, 기본 타임아웃 1초 |
 | | `test_local_cache_expires_the_same_way` | 로컬 캐시도 mini-redis처럼 TTL이 지나면 만료 |
 | | `test_session_expires_after_ttl` | 세션 TTL이 지나면 401 |
-| 두 캐시의 동작이 달랐음 | `test_expired_key_delete_is_same_on_both_caches` | 만료된 키를 지우면 두 캐시 모두 `False` (고치기 전엔 로컬 캐시만 `True`) |
-| 실제 네트워크 경로가 테스트되지 않았음 | `test_cache_aside_and_invalidation_over_http` | mini-redis를 실제 포트에 띄우고 `RedisCache`로 조회·무효화 |
+| 두 캐시를 같게 맞춤 | `test_expired_key_delete_is_same_on_both_caches` | 만료된 키를 지우면 두 캐시 모두 `False` (고치기 전엔 로컬 캐시만 `True`) |
+| 실제 네트워크 경로 확인 | `test_cache_aside_and_invalidation_over_http` | mini-redis를 실제 포트에 띄우고 `RedisCache`로 조회·무효화 |
 | | `test_ttl_is_sent_over_http` | TTL이 네트워크 요청에 실려 mini-redis까지 가서 만료가 일어남 |
 | | `test_session_over_http` | 실제 네트워크로 서버 A 로그인, 서버 B 확인, 로그아웃 |
 
-처음 테스트는 서버를 띄우지 않으려고 mini-redis를 `test_client`로 흉내 냈습니다. 그래서 데모 API가 실제로 쓰는 `RedisCache`는 한 번도 테스트되지 않았고, 이를 메우려고 마지막 세 개를 만들었습니다.
+처음 테스트는 빠르게 돌리려고 서버를 띄우지 않고 mini-redis를 `test_client`로 불렀습니다. 마지막 세 개는 mini-redis를 실제 포트에 띄워, 데모 API가 실제로 쓰는 `RedisCache` 경로까지 확인합니다.
 
+## 3. 변이 검사: 테스트가 정말 일하는지
+
+테스트가 모두 통과해도, 그 테스트가 설계 결정을 지키는지는 알 수 없습니다. 그래서 결정 하나씩 코드를 일부러 어긋나게 바꾸고(변이), 그 결정을 맡은 테스트가 실패하는지 봤습니다. `check_tests_catch_bugs.py`가 변이를 넣고, 테스트를 돌리고, 코드를 되돌리는 일을 자동으로 반복합니다.
+
+| 망가뜨린 것 | 실패해야 하는 테스트 | 결과 |
+|---|---|---|
+| 가격 수정 후 캐시를 지우지 않음 | `test_price_update_invalidates_cache` | 잡음 |
+| 캐시를 DB 수정보다 먼저 지움 | `test_db_is_updated_before_cache_delete` | 잡음 |
+| 캐시 삭제가 실패하면 500을 돌려줌 | `test_write_still_succeeds` | 잡음 |
+| `?nocache=1`이어도 캐시를 씀 | `test_nocache_skips_cache` | 잡음 |
+| 통신 실패를 예외로 터뜨림 | `test_read_answers_from_db` | 잡음 |
+| 타임아웃 기본값을 5초로 바꿈 | `test_slow_mini_redis_times_out` | 잡음 |
+| 로컬 캐시가 TTL을 무시함 | `test_local_cache_expires_the_same_way` | 잡음 |
+| 로컬 캐시가 만료된 키 삭제에 `True`를 돌려줌 | `test_expired_key_delete_is_same_on_both_caches` | 잡음 |
+| 세션에 TTL을 주지 않음 | `test_session_expires_after_ttl` | 잡음 |
+| `RedisCache.get`이 응답을 잘못 읽음 | `test_cache_aside_and_invalidation_over_http` | 잡음 |
+| `RedisCache.delete`가 항상 `False` | `test_cache_aside_and_invalidation_over_http` | 잡음 |
+| `RedisCache.set`이 TTL을 보내지 않음 | `test_ttl_is_sent_over_http` | 잡음 |
+
+2절의 테스트를 더한 지금은 12가지를 모두 잡습니다.
+
+## 4. 테스트를 늘린 과정
+
+같은 변이 12가지를 테스트 파일의 세 시점에 돌려 비교했습니다.
+
+| 시점 | `test_demo.py` 테스트 수 | 잡은 변이 | 아직 확인 범위 밖이던 것 |
+|---|---|---|---|
+| 8·9단계를 처음 만들었을 때 | 14개 | **4 / 12** | DB 먼저 고치는 순서, 타임아웃, 로컬 캐시 만료, 만료 키 삭제 결과, 세션 TTL, `RedisCache` 조회·삭제·저장 |
+| 결정과 테스트를 짝지어 빈 결정을 채운 뒤 | 17개 | **6 / 12** | 타임아웃 기본값, 만료 키 삭제 결과, 세션 TTL, `RedisCache` 조회·삭제·저장 |
+| AI 검토자의 검토를 반영한 뒤 | 22개 | **12 / 12** | 없음 |
+
+- 처음 14개 테스트는 완료 기준과 서버 두 대 장면을 확인하려고 만든 것이라, 설계 결정 12가지 중 8가지는 확인 범위 밖이었습니다.
+- 그 과정에서 찾은 기능상의 차이는 5절에 정리했습니다.
+- 전체 테스트는 63개에서 71개가 되었습니다.
+
+## 5. 검토에서 고친 것
+
+| 찾은 것 | 고친 곳과 방법 |
+|---|---|
+| 이미 만료된 키를 지우라고 하면 mini-redis는 "지울 게 없었다(`false`)"고 답하는데, 로컬 캐시는 "지웠다(`true`)"고 답했습니다. 같은 상황에서 가격 수정 응답의 `cache_invalidated`가 캐시 종류에 따라 달랐습니다. | `demo/cache.py` `LocalCache.delete`: 만료 여부도 확인해서, 만료된 키면 `false`를 돌려주게 함 |
+| 로그인 세션은 DB에 없고 mini-redis에만 있어서, mini-redis가 꺼지면 로그인은 토큰을 주지만 세션이 저장되지 않아 다음 요청에서 401이 납니다. | 데모 범위라 동작은 그대로 두고, `demo/README.md` 「알고 남겨 둔 한계」에 적음 |
+| 벤치마크를 DB 지연 0.3초로 돌려도 결과 표에는 "가짜 DB 지연 3초"가 찍혔습니다. mini-redis가 꺼져 있거나 앱이 로컬 캐시로 떠 있어도 그대로 측정했습니다. | `demo/app.py`: `/` 응답에 실제 설정값(`db_delay_seconds`, `cache_ttl_seconds`)을 넣음. `bench/benchmark.py`: 그 값을 표에 찍고, 잘못된 조건이면 안내하고 멈춤 |
+
+이 테스트와 검사는 Claude Code와 함께 설계하고 실행했습니다.
 ## 3. 변이 검사: 테스트가 정말 일하는지
 
 테스트가 모두 통과해도, 그 테스트가 설계 결정을 지키는지는 알 수 없습니다. 그래서 결정 하나씩 코드를 일부러 어긋나게 바꾸고(변이), 그 결정을 맡은 테스트가 실패하는지 봤습니다. `check_tests_catch_bugs.py`가 변이를 넣고, 테스트를 돌리고, 코드를 되돌리는 일을 자동으로 반복합니다.
