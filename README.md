@@ -67,7 +67,7 @@ cd mini-redis
 python -m venv .venv
 ```
 
-이 프로젝트에서만 쓰는 파이썬 환경을 `.venv` 폴더에 만듭니다. 다른 프로젝트에 설치한 패키지와 섞이지 않게 하기 위해서입니다.
+이 프로젝트에서만 쓰는 파이썬 환경을 `.venv` 폴더에 만듭니다.
 
 ```bash
 source .venv/bin/activate        # macOS, Linux
