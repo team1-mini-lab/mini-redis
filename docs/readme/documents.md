@@ -4,7 +4,7 @@
 
 | 보고 싶은 것 | 문서 |
 | --- | --- |
-| 요구사항(R1~R12)과 개발 단계(0~14), 접점, 결정 참고사항 | [docs/DESIGN.md](../../docs/DESIGN.md) |
+| 요구사항(R1~R12)과 개발 단계(0~14), 결정 참고사항 | [docs/DESIGN.md](../../docs/DESIGN.md) |
 | 과제 원문과 팀 학습 원칙 | [docs/REQUIREMENTS.md](../../docs/REQUIREMENTS.md) |
 | 팀 결정 기록: 세 사람이 단계별로 고른 것, 주고받은 피드백, 기준 구현을 고른 이유 | [docs/DECISIONS.md](../../docs/DECISIONS.md) |
 | 그중 단계별 선택 비교 (0~6단계) | [DECISIONS.md 3장](../../docs/DECISIONS.md#3-단계별로-세-사람이-고른-것) |

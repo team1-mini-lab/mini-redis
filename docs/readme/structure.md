@@ -4,10 +4,10 @@
 
 ```
 데모 API (demo/app.py, 웹 서버 여러 대)
-   │ HTTP                                       접점 2
+   │ HTTP
    ▼
 mini_redis/server.py   요청 해석 → 입력 검증 → 저장소 호출 → JSON 응답
-   │ set / get / delete                         접점 1
+   │ set / get / delete
    ▼
 mini_redis/store.py    lock 하나 · (값, 만료 시점) 묶음 · 지연 삭제
    │ put / get / remove
