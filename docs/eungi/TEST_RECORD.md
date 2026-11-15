@@ -82,13 +82,10 @@ python docs/eungi/check_tests_catch_bugs.py     # 변이 검사 12가지
 
 ## 4. 검토에서 고친 것
 
-테스트를 더한 것 말고, 코드와 README를 비교하다 찾아 직접 고친 것입니다.
-
 | 무엇이 문제였나 | 고친 곳과 방법 |
 |---|---|
-| README에 "캐시 삭제 줄을 빼면 로그아웃 테스트가 실패한다"고 적혀 있었습니다. 실제로 빼 보니 로그아웃 테스트는 통과하고, 다른 테스트 3개가 실패했습니다. | `demo/README.md` 「테스트」 절: 실제로 실패하는 `test_price_update_invalidates_cache`, `test_mini_redis_stays_consistent`, `test_db_is_updated_before_cache_delete`로 바꿈 |
-| 이미 만료된 키를 지우라고 하면 mini-redis는 "지울 게 없었다(`false`)"고 답하는데, 로컬 캐시는 "지웠다(`true`)"고 답했습니다. 그래서 같은 상황에서 가격 수정 응답의 `cache_invalidated`가 캐시 종류에 따라 달랐고, README의 "로컬 캐시도 mini-redis와 같은 방식"이라는 설명과 맞지 않았습니다. | `demo/cache.py` `LocalCache.delete`: 지울 때 만료 여부도 확인해서, 만료된 키면 `false`를 돌려주게 함 |
-| README가 "mini-redis가 죽어도 DB로 응답하니 기능 문제는 없다"고 했지만, 로그인 세션은 DB에 없고 mini-redis에만 있습니다. mini-redis가 꺼지면 로그인은 토큰을 주지만 세션이 저장되지 않아 다음 요청에서 401이 납니다. | `demo/README.md`: 설계 결정 표에 세션 예외를 적고, 「알고 남겨 둔 한계」 절을 추가 |
-| 벤치마크를 `DEMO_DB_DELAY=0.3`(DB 지연 0.3초)으로 돌려도, 결과 표 첫 줄에는 "가짜 DB 지연 3초, 캐시 TTL 60초"가 그대로 찍혔습니다. 문장이 코드에 고정되어 있었기 때문입니다. 또 mini-redis가 꺼져 있거나 앱이 로컬 캐시로 떠 있어도 그대로 재서, "mini-redis를 쓸 때"가 아닌 숫자를 낼 수 있었습니다. | `demo/app.py`: `/` 응답에 실제 설정값 `db_delay_seconds`, `cache_ttl_seconds`를 넣음. `bench/benchmark.py`: 그 값을 받아 표에 찍고, mini-redis가 꺼져 있거나 로컬 캐시면 안내하고 멈춤 |
+| 이미 만료된 키를 지우라고 하면 mini-redis는 "지울 게 없었다(`false`)"고 답하는데, 로컬 캐시는 "지웠다(`true`)"고 답했습니다. 같은 상황에서 가격 수정 응답의 `cache_invalidated`가 캐시 종류에 따라 달랐습니다. | `demo/cache.py` `LocalCache.delete`: 만료 여부도 확인해서, 만료된 키면 `false`를 돌려주게 함 |
+| 로그인 세션은 DB에 없고 mini-redis에만 있어서, mini-redis가 꺼지면 로그인은 토큰을 주지만 세션이 저장되지 않아 다음 요청에서 401이 납니다. | 데모 범위라 동작은 그대로 두고, `demo/README.md` 「알고 남겨 둔 한계」에 적음 |
+| 벤치마크를 DB 지연 0.3초로 돌려도 결과 표에는 "가짜 DB 지연 3초"가 찍혔습니다. mini-redis가 꺼져 있거나 앱이 로컬 캐시로 떠 있어도 그대로 측정했습니다. | `demo/app.py`: `/` 응답에 실제 설정값(`db_delay_seconds`, `cache_ttl_seconds`)을 넣음. `bench/benchmark.py`: 그 값을 표에 찍고, 잘못된 조건이면 안내하고 멈춤 |
 
 이 테스트와 검사는 Claude Code와 함께 설계하고 실행했습니다.
