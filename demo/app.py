@@ -64,7 +64,7 @@ def update_price(product_id):
     if error:
         return bad_request(error)
     if not db.update_price(product_id, body["price"]):
-        return not_found("없는 상품입니다")
+        return not_found("없는 종목입니다")
     cache_invalidated = invalidate_popular_products()
     return jsonify({
         "server": server_name(),
@@ -78,7 +78,7 @@ def update_price(product_id):
 def get_product(product_id):
     product = db.get_product(product_id)
     if product is None:
-        return not_found("없는 상품입니다")
+        return not_found("없는 종목입니다")
     return jsonify(product)
 
 
@@ -140,7 +140,7 @@ def method_not_allowed(error):
 
 
 def read_popular_products_through_cache():
-    """(상품 목록, 가져온 곳)을 돌려준다. 가져온 곳은 "cache" 또는 "db"."""
+    """(종목 목록, 가져온 곳)을 돌려준다. 가져온 곳은 "cache" 또는 "db"."""
     cached = cache.get(POPULAR_KEY)
     if cached is not None:
         return cached, "cache"

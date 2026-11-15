@@ -15,26 +15,26 @@ class ExpiryTest(unittest.TestCase):
         self.client = server.app.test_client()
 
     def set_popular(self, **extra):
-        return self.client.post("/set", json={"key": "popular", "value": "상품목록", **extra})
+        return self.client.post("/set", json={"key": "popular", "value": "종목목록", **extra})
 
     def test_1_set_stores_value_with_expire_time(self):
-        """장면 1: ttl=10으로 저장하면 노드의 value에 ("상품목록", 1010) 묶음이 들어간다."""
+        """장면 1: ttl=10으로 저장하면 노드의 value에 ("종목목록", 1010) 묶음이 들어간다."""
         self.set_popular(ttl=10)
-        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+        self.assertEqual(server.store._table.get("popular"), ("종목목록", 1010))
 
     def test_2_get_before_expire_returns_value(self):
         """장면 2: 1005초에는 아직 만료 전이라 값이 나오고, 노드도 그대로 있다."""
         self.set_popular(ttl=10)
         self.now = 1005
         res = self.client.get("/get?key=popular")
-        self.assertEqual((res.status_code, res.get_json()), (200, {"key": "popular", "value": "상품목록"}))
-        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+        self.assertEqual((res.status_code, res.get_json()), (200, {"key": "popular", "value": "종목목록"}))
+        self.assertEqual(server.store._table.get("popular"), ("종목목록", 1010))
 
     def test_3_get_after_expire_removes_node_and_404(self):
         """장면 3: 1010초(경계값)에 get하면 만료로 보고 노드를 지운 뒤 404."""
         self.set_popular(ttl=10)
         self.now = 1010
-        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))  # get 전에는 노드가 남아 있음
+        self.assertEqual(server.store._table.get("popular"), ("종목목록", 1010))  # get 전에는 노드가 남아 있음
         res = self.client.get("/get?key=popular")
         self.assertEqual((res.status_code, res.get_json()), (404, {"error": "not found"}))
         self.assertIsNone(server.store._table.get("popular"))                    # get 후에는 노드가 사라짐
@@ -75,16 +75,16 @@ class ExpiryTest(unittest.TestCase):
         for i in range(20):                                  # 키 20개를 더 넣어 8칸 → 32칸으로 확장시킨다
             self.client.post("/set", json={"key": f"k{i}", "value": i})
         self.assertGreater(server.store._table.capacity, capacity_before)
-        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+        self.assertEqual(server.store._table.get("popular"), ("종목목록", 1010))
         self.now = 1010
         self.assertEqual(self.client.get("/get?key=popular").status_code, 404)
 
     def test_put_tuple_again_keeps_expire_time(self):
         """해시 테이블 put에 (값, 만료 시점) 튜플을 다시 넣어도 만료 시점은 사라지지 않는다 (튜플은 값 하나)."""
         self.set_popular(ttl=10)
-        entry = server.store._table.get("popular")          # ("상품목록", 1010)
+        entry = server.store._table.get("popular")          # ("종목목록", 1010)
         server.store._table.put("popular", entry)            # 같은 튜플로 다시 put
-        self.assertEqual(server.store._table.get("popular"), ("상품목록", 1010))
+        self.assertEqual(server.store._table.get("popular"), ("종목목록", 1010))
 
 
 if __name__ == "__main__":

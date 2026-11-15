@@ -40,7 +40,7 @@ class LockTest(unittest.TestCase):
         """
         now = [1000]
         store = Store(clock=lambda: now[0])
-        store.set("popular", "상품목록", ttl=10)      # 만료 시점 1010
+        store.set("popular", "종목목록", ttl=10)      # 만료 시점 1010
         now[0] = 1010
 
         other = threading.Thread(target=lambda: store.set("popular", "새목록"))

@@ -125,7 +125,7 @@ class ScenarioPart:
         requests.post(f"{HOST}:{self.port_a}/stats/reset", timeout=5)
 
     def server_a_reads_with_empty_cache(self):
-        self.begin_step("① 서버 A로 인기 상품 조회 (캐시가 비어 있음)")
+        self.begin_step("① 서버 A로 거래량 상위 종목 조회 (캐시가 비어 있음)")
         self.show_popular_products(self.port_a, "A")
         note(f"→ 캐시가 비어 있어 DB에서 50,000원을 가져오고, {self.cache_of_server_a}에 저장")
 
@@ -146,7 +146,7 @@ class ScenarioPart:
         print(f"    서버 A({self.port_a})  가격 수정 → SW-AI {NEW_PRICE:,}원"
               f"   (캐시 삭제: {cache_invalidated})")
         self.price_has_changed = True
-        note(f"→ DB에 {NEW_PRICE:,}원으로 저장하고, {self.cache_of_server_a}에서 인기 상품을 지움")
+        note(f"→ DB에 {NEW_PRICE:,}원으로 저장하고, {self.cache_of_server_a}에서 거래량 상위 종목을 지움")
         note("  캐시에 새 값을 넣지는 않음. 새 값은 다음 조회 때 DB에서 가져와 채움")
         if self.uses_local_cache:
             note("  서버 B의 캐시는 A가 지울 수 없음 → B엔 50,000원이 그대로")

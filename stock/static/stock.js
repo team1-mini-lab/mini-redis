@@ -238,7 +238,7 @@ function milliseconds(elapsedMs) {
   return `${Math.round(elapsedMs).toLocaleString("ko-KR")}ms`;
 }
 
-// 데모 API 호출. 데모 API는 "상품, 판매량"이라는 말을 쓰므로 여기서 "종목, 거래량"으로 바꿔 준다.
+// 데모 API 호출. 데모 API의 주소와 응답 칸 이름은 products, sales이므로 여기서 stock, volume으로 바꿔 준다.
 // 나중에 미니 DBMS를 붙일 때는 이 묶음만 바꾸면 된다.
 
 const api = {

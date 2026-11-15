@@ -14,7 +14,7 @@ DB_PATH = os.environ.get(
 QUERY_DELAY = float(os.environ.get("DEMO_DB_DELAY", "3"))
 WRITE_LOCK_WAIT_SECONDS = 5
 
-# (id, 이름, 가격, 판매량)
+# (id, 이름, 가격, 거래량)
 SEED_PRODUCTS = [
     (1, "SW-AI", 50000, 320),
     (2, "게임 랩", 20000, 280),
@@ -25,7 +25,7 @@ SEED_PRODUCTS = [
 
 
 def init():
-    """이미 상품이 있으면 건드리지 않는다. 다른 서버가 고쳐 둔 가격을 덮어쓰지 않기 위해서다."""
+    """이미 종목이 있으면 건드리지 않는다. 다른 서버가 고쳐 둔 가격을 덮어쓰지 않기 위해서다."""
     with closing(_connect()) as connection, connection:
         _create_tables_if_missing(connection)
         if _has_no_products(connection):
@@ -34,7 +34,7 @@ def init():
 
 
 def reset():
-    """상품과 조회 횟수를 처음 상태로 돌린다."""
+    """종목과 조회 횟수를 처음 상태로 돌린다."""
     init()
     with closing(_connect()) as connection, connection:
         connection.execute("DELETE FROM products")
@@ -43,7 +43,7 @@ def reset():
 
 
 def get_popular_products(limit=3):
-    """판매량 순 상위 상품. 무거운 집계 조회를 흉내 내려고 QUERY_DELAY초 걸린다."""
+    """거래량 순 상위 종목. 무거운 집계 조회를 흉내 내려고 QUERY_DELAY초 걸린다."""
     time.sleep(QUERY_DELAY)
     with closing(_connect()) as connection, connection:
         _increase_query_count(connection)
@@ -55,7 +55,7 @@ def get_popular_products(limit=3):
 
 
 def get_product(product_id):
-    """없는 상품이면 None."""
+    """없는 종목이면 None."""
     with closing(_connect()) as connection:
         row = connection.execute(
             "SELECT id, name, price, sales FROM products WHERE id = ?", (product_id,)
@@ -64,7 +64,7 @@ def get_product(product_id):
 
 
 def update_price(product_id, price):
-    """고쳤으면 True, 없는 상품이면 False."""
+    """고쳤으면 True, 없는 종목이면 False."""
     with closing(_connect()) as connection, connection:
         cursor = connection.execute(
             "UPDATE products SET price = ? WHERE id = ?", (price, product_id)
