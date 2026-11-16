@@ -1,5 +1,4 @@
 # 미니 레디스 설계 문서
-개념 설명은 [REDIS_OVERVIEW.md](./REDIS_OVERVIEW.md)에 있습니다.
 
 ## 1. 요구사항
 
@@ -48,8 +47,8 @@
 
 | 동작 | 요청 | 성공 응답 | 실패 응답 |
 | --- | --- | --- | --- |
-| 저장 | `POST /set` 본문 `{"key": "name", "value": "현지", "ttl": 600}` (`ttl`은 선택) | 200 `{"ok": true}` | 400 (잘못된 입력) |
-| 조회 | `GET /get?key=name` | 200 `{"key": "name", "value": "현지"}` | 404 (없거나 만료됨), 400 |
+| 저장 | `POST /set` 본문 `{"key": "name", "value": "mini", "ttl": 600}` (`ttl`은 선택) | 200 `{"ok": true}` | 400 (잘못된 입력) |
+| 조회 | `GET /get?key=name` | 200 `{"key": "name", "value": "mini"}` | 404 (없거나 만료됨), 400 |
 | 삭제 | `DELETE /delete?key=name` | 200 `{"deleted": true}` 또는 `{"deleted": false}` | 400 |
 
 세부 동작은 4번 결정 기록에 단계별로 정리되어 있습니다.

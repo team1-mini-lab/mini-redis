@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>미니 증권</title>
+  <link rel="stylesheet" href="/static/stock.css">
+</head>
+<body>
+  <header class="top-bar">
+    <a class="brand" href="/">미니 증권</a>
+    <div class="session">
+      <form id="login-form" class="login-form">
+        <label class="visually-hidden" for="login-user">이름</label>
+        <input id="login-user" name="user" placeholder="이름" autocomplete="off" required>
+        <button type="submit" class="quiet">로그인</button>
+      </form>
+      <div id="logged-in" class="logged-in" hidden>
+        <span id="logged-in-user"></span>
+        <button type="button" id="logout-button" class="quiet">로그아웃</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="trading">
+      <section aria-labelledby="ranking-title" class="panel">
+        <div class="section-head">
+          <h1 id="ranking-title">거래량 상위 종목</h1>
+          <div class="section-tools">
+            <label class="toggle">
+              <input type="checkbox" id="use-cache" checked>
+              캐시 사용
+            </label>
+            <button type="button" id="reload-button" class="quiet">새로고침</button>
+          </div>
+        </div>
+        <p class="response-info" id="response-info" aria-live="polite">불러오는 중</p>
+        <table class="ranking">
+          <thead>
+            <tr>
+              <th scope="col" class="rank">순위</th>
+              <th scope="col">종목</th>
+              <th scope="col" class="number">현재가</th>
+              <th scope="col" class="number">거래량</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-rows"></tbody>
+        </table>
+      </section>
+
+      <section aria-labelledby="order-title" class="panel order">
+        <h2 id="order-title">매수 주문</h2>
+        <p class="order-stock" id="order-stock">종목을 선택하세요</p>
+        <p class="order-price" id="order-price">-</p>
+        <form id="order-form" class="order-form">
+          <label>
+            <span>수량</span>
+            <input id="order-quantity" name="quantity" type="number" min="1" step="1" value="1" required>
+          </label>
+          <dl class="order-total">
+            <dt>주문 금액</dt>
+            <dd id="order-total">-</dd>
+          </dl>
+          <button type="submit" class="buy" id="buy-button" disabled>매수</button>
+        </form>
+
+        <form id="price-form" class="price-form">
+          <label>
+            <span>시세 변경</span>
+            <input id="new-price" name="price" type="number" min="0" step="100" required disabled>
+          </label>
+          <button type="submit" class="quiet" id="price-button" disabled>반영</button>
+        </form>
+      </section>
+    </div>
+
+    <section aria-labelledby="behind-title" class="panel behind">
+      <h2 id="behind-title">화면 뒤에서 일어난 일</h2>
+      <dl class="facts">
+        <div><dt>응답한 서버</dt><dd id="fact-server">-</dd></div>
+        <div><dt>데이터 출처</dt><dd id="fact-source">-</dd></div>
+        <div><dt>걸린 시간</dt><dd id="fact-elapsed">-</dd></div>
+        <div><dt>DB 조회 횟수</dt><dd id="fact-db-queries">-</dd></div>
+      </dl>
+      <div class="behind-tools">
+        <button type="button" id="clear-cache-button" class="quiet">캐시 비우기</button>
+        <button type="button" id="reset-stats-button" class="quiet">조회 횟수 초기화</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="later-title" class="later">
+      <h2 id="later-title">준비 중</h2>
+      <ul class="later-list">
+        <li>주문 저장과 체결 내역 (미니 DBMS 연결 후)</li>
+        <li>보유 종목과 잔고 (미니 DBMS 연결 후)</li>
+      </ul>
+    </section>
+  </main>
+
+  <template id="ranking-row">
+    <tr>
+      <td class="rank"></td>
+      <td><button type="button" class="stock-name"></button></td>
+      <td class="number stock-price"></td>
+      <td class="number stock-volume"></td>
+    </tr>
+  </template>
+
+  <script src="/static/stock.js"></script>
+</body>
+</html>

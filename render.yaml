@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mini-stock
+    runtime: python
+    plan: free
+    branch: feat/stock-page
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m deploy.start
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.18
