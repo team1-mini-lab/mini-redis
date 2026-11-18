@@ -1,8 +1,12 @@
 """mini-redis HTTP API. 요청을 검증한 뒤 저장소를 호출하고 JSON으로 응답한다."""
+import os
+import signal
+import sys
 import threading
 
 from flask import Flask, jsonify, request
 
+from mini_redis.snapshot import load_snapshot, run_snapshots, save_snapshot
 from mini_redis.store import Store
 
 app = Flask(__name__)
@@ -13,6 +17,7 @@ HOST = "127.0.0.1"
 PORT = 8000
 SET_FIELDS = {"key", "value", "ttl"}
 MAX_TTL = 10 * 365 * 24 * 60 * 60
+SNAPSHOT_PATH = os.environ.get("MINI_REDIS_SNAPSHOT", "data/snapshot.json")
 
 
 @app.get("/")
@@ -122,6 +127,33 @@ def start_cleanup_thread(stop):
     return thread
 
 
+def start_snapshot_thread(stop):
+    """30초마다 스냅샷을 찍는 백그라운드 스레드를 켠다."""
+    thread = threading.Thread(target=run_snapshots, args=(store, SNAPSHOT_PATH, stop), daemon=True)
+    thread.start()
+    return thread
+
+
+def exit_on_sigterm(signum, frame):
+    """kill(SIGTERM)도 Ctrl+C처럼 아래 finally를 거쳐 끝나게 한다. 기본 동작은 그 자리에서 바로 끝남."""
+    sys.exit(0)
+
+
+def main():
+    # 요청을 받기 전에 저장소부터 채운다. 그 뒤에 저장소를 건드리는 스레드와 서버를 켠다.
+    load_snapshot(store, SNAPSHOT_PATH)
+    stop = threading.Event()
+    start_cleanup_thread(stop)
+    snapshot_thread = start_snapshot_thread(stop)
+    signal.signal(signal.SIGTERM, exit_on_sigterm)
+    try:
+        app.run(host=HOST, port=PORT)
+    finally:
+        # 같은 .tmp에 두 곳이 동시에 쓰지 않게: 스냅샷 스레드를 멈추고, 하던 저장이 끝나길 기다린 뒤 마지막으로 저장한다.
+        stop.set()
+        snapshot_thread.join()
+        save_snapshot(store, SNAPSHOT_PATH)
+
+
 if __name__ == "__main__":
-    start_cleanup_thread(threading.Event())
-    app.run(host=HOST, port=PORT)
+    main()
