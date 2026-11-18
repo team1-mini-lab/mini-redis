@@ -1,9 +1,10 @@
-"""배포용 실행 스크립트. 서버 3개를 한 서비스 안에서 함께 켠다.
+"""배포용 실행 스크립트. 서버 4개를 한 서비스 안에서 함께 켠다.
 
     바깥 → 주식 화면 서버(0.0.0.0:$PORT) → 데모 API(127.0.0.1:8001) → mini-redis(127.0.0.1:8000)
+                                                                  ↘ 미니 DBMS(127.0.0.1:8020)
 
 호스팅 서비스는 포트 하나만 바깥에 열어 준다. 그래서 화면 서버만 바깥 요청을 받고,
-나머지 둘은 서비스 안에서만 닿는 주소에 둔다.
+나머지 셋은 서비스 안에서만 닿는 주소에 둔다.
 """
 import os
 import subprocess
@@ -14,6 +15,7 @@ import requests
 
 MINI_REDIS_URL = "http://127.0.0.1:8000"
 DEMO_API_URL = "http://127.0.0.1:8001"
+MINI_DBMS_URL = "http://127.0.0.1:8020/health"
 PUBLIC_HOST = "0.0.0.0"
 PUBLIC_PORT = os.environ.get("PORT", "8010")
 STARTUP_TIMEOUT_SECONDS = 30
@@ -25,6 +27,8 @@ def main():
     try:
         servers.append(start_server("mini_redis.server"))
         wait_until_up(MINI_REDIS_URL)
+        servers.append(start_server("demo.dbms_server"))
+        wait_until_up(MINI_DBMS_URL)
         servers.append(start_server("demo.app"))
         wait_until_up(DEMO_API_URL)
         servers.append(start_server(
