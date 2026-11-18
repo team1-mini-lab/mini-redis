@@ -67,7 +67,7 @@ def decrement():
 
 
 def change_number(amount):
-    """정수 값을 1 늘리거나 줄인다. 읽기·계산·저장을 저장소 안에서 한 번에 하므로 요청끼리 끼어들지 못한다."""
+    """정수 값을 1 늘리거나 줄인다."""
     body = request.get_json(silent=True)
     error = find_counter_body_error(body)
     if error:

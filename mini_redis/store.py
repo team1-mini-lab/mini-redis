@@ -52,13 +52,7 @@ class Store:
             return True
 
     def incr(self, key, amount=1):
-        """정수 값에 amount를 더하고 새 값을 돌려준다. 빼려면 amount를 음수로 준다.
-
-        읽기 → 더하기 → 저장을 lock 한 번 안에서 끝내므로, 두 요청이 같은 값을 읽고 각자 저장해
-        하나가 사라지는 일이 없다 (원자적 명령). get과 set을 따로 부르면 그 사이에 다른 요청이 끼어든다.
-        없거나 만료된 키는 0에서 시작하고, 이미 있던 만료 시점은 그대로 둔다 (실제 Redis의 INCR과 같음).
-        정수가 아닌 값이면 NotAnInteger.
-        """
+        """읽기·더하기·저장을 lock 한 번 안에서 끝내 새 값을 돌려준다 (없는 키는 0부터, 만료 시간은 유지)."""
         with self._lock:
             entry = self._find_live_entry(key)
             value, expire_at = entry if entry is not None else (0, NEVER_EXPIRES)
