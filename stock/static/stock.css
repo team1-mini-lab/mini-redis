@@ -214,7 +214,6 @@ button:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .account { min-width: 0; }
 .account h3 { margin: 18px 0 6px; font-size: 0.95rem; }
-.account-note { margin: 0; color: var(--ink-soft); font-size: 0.85rem; }
 .account-empty { margin: 0; color: var(--ink-soft); }
 .account .empty { color: var(--ink-soft); text-align: center; }
 .account .ranking { font-variant-numeric: tabular-nums; }
