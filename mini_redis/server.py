@@ -7,7 +7,7 @@ import threading
 from flask import Flask, jsonify, request
 
 from mini_redis.snapshot import load_snapshot, run_snapshots, save_snapshot
-from mini_redis.store import Store
+from mini_redis.store import NotAnInteger, Store
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
@@ -56,6 +56,29 @@ def delete_value():
     return jsonify({"deleted": store.delete(key)})
 
 
+@app.post("/incr")
+def increment():
+    return change_number(+1)
+
+
+@app.post("/decr")
+def decrement():
+    return change_number(-1)
+
+
+def change_number(amount):
+    """정수 값을 1 늘리거나 줄인다. 읽기·계산·저장을 저장소 안에서 한 번에 하므로 요청끼리 끼어들지 못한다."""
+    body = request.get_json(silent=True)
+    error = find_counter_body_error(body)
+    if error:
+        return bad_request(error)
+    try:
+        value = store.incr(body["key"], amount)
+    except NotAnInteger as e:
+        return bad_request(str(e))
+    return jsonify({"key": body["key"], "value": value})
+
+
 @app.errorhandler(404)
 def unknown_path(error):
     return jsonify({"error": "없는 주소입니다"}), 404
@@ -84,6 +107,15 @@ def find_set_body_error(body):
         or find_value_error(body["value"])
         or find_ttl_error(body.get("ttl"))
     )
+
+
+def find_counter_body_error(body):
+    if not isinstance(body, dict):
+        return "요청 본문은 JSON 객체여야 합니다"
+    unknown_fields = body.keys() - {"key"}
+    if unknown_fields:
+        return f"알 수 없는 항목입니다: {', '.join(sorted(unknown_fields))}"
+    return find_key_error(body.get("key"))
 
 
 def find_key_error(key):
