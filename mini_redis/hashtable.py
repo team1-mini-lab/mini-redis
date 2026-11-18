@@ -49,6 +49,23 @@ class HashTable:
             node = node.next
         return False
 
+    def scan(self, cursor, count):
+        """cursor번 칸부터 최대 count칸에 든 (키, 값)을 꺼내 준다.
+
+        (다음 cursor, [(키, 값), ...])을 돌려준다. 마지막 칸까지 봤으면 다음 cursor는 0이다.
+        값이 무엇인지는 모른다. 꺼내 주기만 하고 아무것도 지우지 않는다.
+        """
+        if cursor >= len(self._buckets):
+            cursor = 0
+        end = min(cursor + count, len(self._buckets))
+        items = [
+            (node.key, node.value)
+            for index in range(cursor, end)
+            for node in _chain(self._buckets[index])
+        ]
+        next_cursor = 0 if end == len(self._buckets) else end
+        return next_cursor, items
+
     def debug_dump(self):
         """칸마다 이어진 체인을 한 줄씩 보여 준다."""
         return "\n".join(

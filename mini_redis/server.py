@@ -1,4 +1,6 @@
 """mini-redis HTTP API. 요청을 검증한 뒤 저장소를 호출하고 JSON으로 응답한다."""
+import threading
+
 from flask import Flask, jsonify, request
 
 from mini_redis.store import Store
@@ -113,5 +115,13 @@ def is_within_ttl_range(ttl):
     return 0 < ttl <= MAX_TTL
 
 
+def start_cleanup_thread(stop):
+    """주기적 정리를 하는 백그라운드 스레드를 켠다. 서버가 꺼지면 함께 끝난다(daemon)."""
+    thread = threading.Thread(target=store.run_cleanup, args=(stop,), daemon=True)
+    thread.start()
+    return thread
+
+
 if __name__ == "__main__":
+    start_cleanup_thread(threading.Event())
     app.run(host=HOST, port=PORT)
