@@ -1,0 +1,13 @@
+{
+  "orders": {
+    "columns": [
+      {"name": "id",         "type": "INT"},
+      {"name": "user",       "type": "TEXT"},
+      {"name": "stock_id",   "type": "INT"},
+      {"name": "stock_name", "type": "TEXT"},
+      {"name": "quantity",   "type": "INT"},
+      {"name": "price",      "type": "INT"},
+      {"name": "ordered_at", "type": "INT"}
+    ]
+  }
+}

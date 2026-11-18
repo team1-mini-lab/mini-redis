@@ -89,12 +89,51 @@
       </div>
     </section>
 
-    <section aria-labelledby="later-title" class="later">
-      <h2 id="later-title">준비 중</h2>
-      <ul class="later-list">
-        <li>주문 저장과 체결 내역 (미니 DBMS 연결 후)</li>
-        <li>보유 종목과 잔고 (미니 DBMS 연결 후)</li>
-      </ul>
+    <section aria-labelledby="account-title" class="panel account">
+      <div class="section-head">
+        <h2 id="account-title">내 계좌</h2>
+        <p class="account-note">미니 DBMS에 저장된 주문으로 계산해요</p>
+      </div>
+      <p class="account-empty" id="account-empty">로그인하면 잔고와 체결 내역이 보여요.</p>
+      <div id="account-body" hidden>
+        <dl class="facts cash">
+          <div><dt>잔고</dt><dd id="account-cash">-</dd></div>
+          <div><dt>평가 금액</dt><dd id="account-value">-</dd></div>
+          <div><dt>처음 돈</dt><dd id="account-starting-cash">-</dd></div>
+        </dl>
+
+        <h3>보유 종목</h3>
+        <div class="table-scroll">
+        <table class="ranking">
+          <thead>
+            <tr>
+              <th scope="col">종목</th>
+              <th scope="col" class="number">수량</th>
+              <th scope="col" class="number">평균 매수가</th>
+              <th scope="col" class="number">현재가</th>
+              <th scope="col" class="number">평가 금액</th>
+            </tr>
+          </thead>
+          <tbody id="holding-rows"></tbody>
+        </table>
+        </div>
+
+        <h3>체결 내역</h3>
+        <div class="table-scroll">
+        <table class="ranking">
+          <thead>
+            <tr>
+              <th scope="col">시각</th>
+              <th scope="col">종목</th>
+              <th scope="col" class="number">수량</th>
+              <th scope="col" class="number">체결 가격</th>
+              <th scope="col" class="number">금액</th>
+            </tr>
+          </thead>
+          <tbody id="order-rows"></tbody>
+        </table>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -105,6 +144,30 @@
       <td class="number stock-price"></td>
       <td class="number stock-volume"></td>
     </tr>
+  </template>
+
+  <template id="holding-row">
+    <tr>
+      <td class="holding-name"></td>
+      <td class="number holding-quantity"></td>
+      <td class="number holding-average"></td>
+      <td class="number holding-price"></td>
+      <td class="number holding-value"></td>
+    </tr>
+  </template>
+
+  <template id="order-row">
+    <tr>
+      <td class="fill-time"></td>
+      <td class="fill-name"></td>
+      <td class="number fill-quantity"></td>
+      <td class="number fill-price"></td>
+      <td class="number fill-amount"></td>
+    </tr>
+  </template>
+
+  <template id="empty-row">
+    <tr><td class="empty" colspan="5"></td></tr>
   </template>
 
   <script src="/static/stock.js"></script>
